@@ -1,0 +1,212 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}AAP{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            margin: 0;
+        }
+
+        .navbar {
+            background: #1e88e5;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar .logo {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .navbar a {
+            color: #fff;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+
+        .navbar .user-info {
+            margin-right: 15px;
+            opacity: 0.9;
+        }
+
+        /* Общий layout: слева панель, справа контент */
+        .layout {
+            display: flex;
+            min-height: calc(100vh - 50px); /* высота экрана минус шапка */
+        }
+
+        .sidebar {
+            width: 220px;
+            background: #eef2f8;
+            padding: 15px;
+            box-sizing: border-box;
+            border-right: 1px solid #d0d7e6;
+        }
+
+        .sidebar-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .sidebar a {
+            display: block;
+            text-decoration: none;
+            color: #333;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .sidebar a:hover {
+            background: #dbe4f5;
+        }
+
+        .content {
+            flex: 1;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .content-inner {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            margin-top: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            font-size: 14px;
+        }
+
+        table th {
+            background: #f0f2f7;
+            text-align: left;
+        }
+
+        a.btn {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #1e88e5;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #e53935;
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #9e9e9e;
+            color: #fff;
+        }
+
+        form input[type="text"],
+        form input[type="password"],
+        form input[type="email"],
+        form input[type="number"],
+        form input[type="date"],
+        form select,
+        form textarea {
+            padding: 6px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        form button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            background: #1e88e5;
+            color: white;
+            cursor: pointer;
+        }
+
+        form button:hover {
+            opacity: 0.9;
+        }
+
+        .error {
+            color: #e53935;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin: 10px 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <span class="logo">AAP</span>
+        <div>
+            {% if user.is_authenticated %}
+                <span class="user-info">
+                    {% blocktrans with username=user.get_username %}
+                        Користувач: {{ username }}
+                    {% endblocktrans %}
+                </span>
+                <a href="{% url 'home' %}">{% trans "Головна" %}</a>
+                <a href="{% url 'dashboard' %}">{% trans "Особистий кабінет" %}</a>
+                <a href="{% url 'logout' %}">{% trans "Вийти" %}</a>
+            {% else %}
+                <a href="{% url 'home' %}">{% trans "Головна" %}</a>
+                <a href="{% url 'login' %}">{% trans "Увійти" %}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="layout">
+        {% if user.is_authenticated %}
+            <div class="sidebar">
+                <div class="sidebar-title">{% trans "Особистий кабінет" %}</div>
+                <a href="{% url 'dashboard' %}">{% trans "Список клієнтів" %}</a>
+                <a href="{% url 'requests' %}">{% trans "Запити" %}</a>
+                <a href="{% url 'documents' %}">База документів</a>
+            </div>
+        {% endif %}
+
+        <div class="content">
+            <div class="content-inner">
+                {% block content %}
+                {% endblock %}
+            </div>
+
+            <div class="footer">
+                AAP – internal app prototype
+            </div>
+        </div>
+    </div>
+</body>
+</html>

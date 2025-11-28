@@ -1,0 +1,58 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}AAP – {% trans "Список клієнтів" %}{% endblock %}
+
+{% block content %}
+<h2>{% trans "Список клієнтів" %}</h2>
+
+{% if user.is_superuser %}
+    <p>
+        <a class="btn btn-primary" href="{% url 'client_create' %}">
+            {% trans "Додати клієнта" %}
+        </a>
+    </p>
+{% endif %}
+
+{% if clients %}
+<table>
+    <thead>
+    <tr>
+        <th>{% trans "Повна назва" %}</th>
+        <th>{% trans "ЄДРПОУ" %}</th>
+        <th>{% trans "№ договору" %}</th>
+        <th>{% trans "Звітний період" %}</th>
+        <th>{% trans "Статус" %}</th>
+        <th>{% trans "Створено" %}</th>
+        <th>{% trans "Дії" %}</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for client in clients %}
+        <tr>
+            <td>{{ client.name }}</td>
+            <td>{{ client.edrpou }}</td>
+            <td>{{ client.requisites_number }}</td>
+            <td>{{ client.reporting_period }}</td>
+            <td>{{ client.status }}</td>
+            <td>{{ client.created_at|date:"d.m.Y H:i" }}</td>
+            <td>
+                <a href="{% url 'client_detail' client.pk %}">{% trans "Дані" %}</a> |
+                <a href="{% url 'client_team' client.pk %}">{% trans "Команда" %}</a>
+                {% if user.is_superuser %}
+                    | <a href="{% url 'client_edit' client.pk %}">{% trans "Змінити" %}</a>
+                    | <a href="{% url 'client_delete' client.pk %}">{% trans "Видалити" %}</a>
+                {% endif %}
+            </td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="7">{% trans "Клієнтів поки що немає." %}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p>{% trans "Клієнтів поки що немає." %}</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,65 @@
+from django.contrib import admin
+from .models import Client
+
+
+@admin.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    list_display = ("name", "edrpou", "reporting_period", "status", "created_at")
+    search_fields = ("name", "edrpou", "kved", "requisites_number")
+    list_filter = ("status", "poi", "mandatory_audit", "cw_controls_done")
+
+    fieldsets = (
+        ("Основные данные", {
+            "fields": ("name", "edrpou", "kved", "poi"),
+        }),
+        ("Адрес (местонахождение)", {
+            "fields": (
+                "address_country",
+                "address_city",
+                "address_street",
+                "address_building",
+                "address_office",
+                "address_zip",
+            ),
+        }),
+        ("Реквизиты договора", {
+            "fields": (
+                "requisites_number",
+                "requisites_date",
+                "requisites_amount",
+                "requisites_vat",
+                "planned_hours", 
+            ),
+        }),
+        ("Надзор, ОПФ, обязательный аудит", {
+            "fields": ("supervision_body", "legal_form", "mandatory_audit"),
+        }),
+        ("Период и срок", {
+            "fields": ("reporting_period", "contract_deadline"),
+        }),
+        ("Предмет задания", {
+            "fields": ("engagement_subject",),
+        }),
+        ("Уполномоченное лицо клиента", {
+            "fields": ("authorized_person_name", "authorized_person_email"),
+        }),
+        ("Аудиторский отчёт", {
+            "fields": (
+                "audit_report_number",
+                "audit_report_date",
+                "audit_report_type",
+                "audit_report_paragraph",
+                "supervision_notice_date",
+                "cw_controls_done",
+            ),
+        }),
+        ("Статус и команда", {
+    "fields": (
+        "status",
+        "manager",
+        "auditor", "auditor2", "auditor3",
+        "assistant", "assistant2", "assistant3", "assistant4",
+        "qa_manager",
+    ),
+}),
+    )

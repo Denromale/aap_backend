@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}AAP – {% trans "Головна" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Головна сторінка AAP" %}</h1>
+
+{% if user.is_authenticated %}
+    <p>
+        {% blocktrans with username=user.username %}
+            Ви увійшли як {{ username }}.
+        {% endblocktrans %}
+    </p>
+    <p>
+        <a class="btn btn-primary" href="{% url 'dashboard' %}">
+            {% trans "Перейти до особистого кабінету" %}
+        </a>
+    </p>
+    <p>
+        <a class="btn btn-secondary" href="{% url 'logout' %}">
+            {% trans "Вийти" %}
+        </a>
+    </p>
+{% else %}
+    <p>{% trans "Ви не авторизовані." %}</p>
+    <p>
+        <a class="btn btn-primary" href="{% url 'login' %}">
+            {% trans "Увійти" %}
+        </a>
+    </p>
+{% endif %}
+{% endblock %}

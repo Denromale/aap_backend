@@ -1,0 +1,73 @@
+{% extends "core/base.html" %}
+
+{% block title %}Запити{% endblock %}
+
+{% block content %}
+<h1>Запити</h1>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div style="margin-bottom: 15px;">
+        <label for="client_id"><strong>Оберіть клієнта:</strong></label>
+        <select name="client_id" id="client_id" style="width: 100%; padding: 6px; margin-top: 5px;">
+            {% for client in clients %}
+                <option value="{{ client.id }}">{{ client.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Блоки запитів -->
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+
+        <!-- 1. Пам'ятка члену команди із завдання -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;">
+            <div>
+                <strong>Пам'ятка члену команди із завдання</strong><br>
+                <span style="font-size: 13px; color: #555;">Word-шаблон: remembrance_team.docx</span>
+            </div>
+            <div style="text-align: right;">
+                <button type="submit"
+                        name="doc_type"
+                        value="remembrance_team"
+                        style="padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
+                    Сформувати документ
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Анкета - опитувальник члена групи при прийнятті завдання, щодо незалежності -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;">
+            <div>
+                <strong>Анкета - опитувальник члена групи при прийнятті завдання, щодо незалежності</strong><br>
+                <span style="font-size: 13px; color: #555;">Word-шаблон: team_independence.docx</span>
+            </div>
+            <div style="text-align: right;">
+                <button type="submit"
+                        name="doc_type"
+                        value="team_independence"
+                        style="padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
+                    Сформувати документ
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Про призначення команди із завдання -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;">
+            <div>
+                <strong>Про призначення команди із завдання</strong><br>
+                <span style="font-size: 13px; color: #555;">Word-шаблон: order.docx</span>
+            </div>
+            <div style="text-align: right;">
+                <button type="submit"
+                        name="doc_type"
+                        value="order"
+                        style="padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
+                    Сформувати документ
+                </button>
+            </div>
+        </div>
+
+    </div>
+</form>
+{% endblock %}

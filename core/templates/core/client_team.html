@@ -1,0 +1,77 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Команда клієнта" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Команда проєкту" %}</h1>
+
+<div style="margin-bottom: 20px;">
+    <p><strong>{% trans "Клієнт:" %}</strong> {{ client.name }}</p>
+    <p>
+        <strong>{% trans "Звітний період (рік):" %}</strong>
+        {{ client.reporting_period }}
+        &nbsp;&nbsp;
+        <strong>{% trans "№ договору:" %}</strong>
+        {{ client.requisites_number }}
+    </p>
+    <p>
+        <strong>{% trans "Робочі години (план):" %}</strong> {{ total_hours|default:"-" }}
+        &nbsp;&nbsp;
+        <strong>{% trans "Бюджет (сума договору):" %}</strong> {{ total_budget|default:"-" }}
+    </p>
+</div>
+
+<table style="width: 100%; border-collapse: collapse; max-width: 800px;">
+    <thead>
+        <tr>
+            <th style="border: 1px solid #ddd; padding: 6px;">{% trans "Роль" %}</th>
+            <th style="border: 1px solid #ddd; padding: 6px;">{% trans "Ім'я" %}</th>
+            <th style="border: 1px solid #ddd; padding: 6px; width: 90px;">{% trans "Години" %}</th>
+            <th style="border: 1px solid #ddd; padding: 6px; width: 120px;">{% trans "Бюджет" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 6px;">{{ row.label }}</td>
+                <td style="border: 1px solid #ddd; padding: 6px;">
+                    {% if row.user %}
+                        {{ row.user.get_full_name|default:row.user.username }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">
+                    {% if row.hours is not None %}
+                        {{ row.hours }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">
+                    {% if row.budget is not None %}
+                        {{ row.budget }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        <tr>
+            <td style="border: 1px solid #ddd; padding: 6px;"><strong>{% trans "Разом" %}</strong></td>
+            <td style="border: 1px solid #ddd; padding: 6px;"></td>
+            <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">
+                {{ total_hours|default:"-" }}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">
+                {{ total_budget|default:"-" }}
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<p style="margin-top: 20px;">
+    <a href="{% url 'dashboard' %}" class="btn btn-secondary">{% trans "Назад" %}</a>
+</p>
+{% endblock %}

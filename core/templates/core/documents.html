@@ -1,0 +1,184 @@
+{% extends "core/base.html" %}
+
+{% block title %}База документів{% endblock %}
+
+{% block content %}
+<h1>База документів</h1>
+
+<form method="get" style="margin-bottom: 15px;">
+    <label for="client_id"><strong>Оберіть клієнта:</strong></label>
+    <select name="client_id"
+            id="client_id"
+            onchange="this.form.submit()"
+            style="width: 100%; max-width: 500px; padding: 6px; margin-top: 5px;">
+        {% for c in clients %}
+            <option value="{{ c.id }}"
+                    {% if selected_client and c.id == selected_client.id %}selected{% endif %}>
+                {{ c.name }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if selected_client %}
+
+    <h2>{{ selected_client.name }}</h2>
+
+    <!-- КНОПКА ПОКАЗАТЬ/СКРЫТЬ БЛОК ЗАВАНТАЖЕННЯ -->
+    <button type="button"
+            onclick="toggleUploadBlock()"
+            style="margin: 15px 0; padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
+        Додати документ
+    </button>
+
+    <!-- БЛОК ЗАВАНТАЖЕННЯ (ПО УМОЛЧАНИЮ СКРЫТИЙ) -->
+    <div id="upload-block"
+         style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+
+        <h3>Завантажити новий документ</h3>
+
+        <form method="post"
+              enctype="multipart/form-data"
+              action="?client_id={{ selected_client.id }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload">
+
+            
+            <div style="margin-bottom: 10px;">
+                <label><strong>Файл:</strong></label><br>
+                <input type="file" name="file">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label><strong>Тип документа:</strong></label><br>
+                <select name="doc_type">
+                    <option value="">---------</option>
+                    <option value="charter">Установчий документ</option>
+                    <option value="request">Запит / лист</option>
+                    <option value="agreement">Договір</option>
+                    <option value="other">Інше</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label><strong>Мітка / примітка:</strong></label><br>
+                <input type="text"
+                       name="label"
+                       style="width: 100%;"
+                       placeholder="Напр.: установчий документ, додатковий запит тощо">
+            </div>
+
+            <button type="submit"
+                    style="padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
+                Завантажити
+            </button>
+        </form>
+    </div>
+
+    <h3 style="margin-top: 25px;">Документи клієнта</h3>
+
+    {% if documents %}
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Назва</th>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Тип</th>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Мітка</th>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Завантажено</th>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Користувач</th>
+                    <th style="border: 1px solid #ddd; padding: 6px;">Дія</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                {% for doc in documents %}
+    <tr>
+        <!-- 1. Название и ссылка на файл -->
+        <td style="border: 1px solid #ddd; padding: 6px;">
+            <a href="{{ doc.file.url }}" target="_blank">
+                {{ doc.original_name }}
+            </a>
+        </td>
+
+        <!-- 2. ОДНА форма на строку: обновление + удаление -->
+        <form method="post" action="{% url 'document_update_type' doc.id %}">
+            {% csrf_token %}
+
+            <!-- Тип документа -->
+            <td style="border: 1px solid #ddd; padding: 6px;">
+                <select name="doc_type">
+                    <option value="">---------</option>
+                    {% for code, label in doc_type_choices %}
+                        <option value="{{ code }}"
+                                {% if doc.doc_type == code %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </td>
+
+            <!-- Мітка -->
+            <td style="border: 1px solid #ddd; padding: 6px;">
+                <input type="text"
+                       name="custom_label"
+                       value="{{ doc.custom_label|default:'' }}"
+                       style="width: 100%;">
+            </td>
+
+            <!-- Дата -->
+            <td style="border: 1px solid #ddd; padding: 6px;">
+                {{ doc.created_at|date:"d.m.Y H:i" }}
+            </td>
+
+            <!-- Користувач -->
+            <td style="border: 1px solid #ddd; padding: 6px;">
+                {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username|default:"" }}
+            </td>
+
+            
+                    <!-- Дві кнопки в одному стовпчику -->
+        <td style="border: 1px solid #ddd; padding: 6px;">
+
+            <!-- Кнопка "Зберегти" (оновити тип / мітку) -->
+            <button type="submit"
+                    style="padding: 4px 8px; border-radius: 4px; border: none;
+                           background: #1e88e5; color: #fff; cursor: pointer; margin-right: 6px;">
+                Зберегти
+            </button>
+
+            <!-- Кнопка "Видалити" (та ж форма, але інший URL) -->
+            <button type="submit"
+                    formaction="{% url 'document_delete' doc.id %}"
+                    onclick="return confirm('Видалити документ?');"
+                    style="padding: 4px 8px; border-radius: 4px; border: none;
+                           background: #e53935; color: #fff; cursor: pointer;">
+                Видалити
+            </button>
+
+        </td>
+
+        </form>
+    </tr>
+{% endfor %}
+
+            </tbody>
+        </table>
+    {% else %}
+        <p>Документів для цього клієнта поки немає.</p>
+    {% endif %}
+
+{% else %}
+    <p>Немає доступних клієнтів.</p>
+{% endif %}
+
+<script>
+    function toggleUploadBlock() {
+        const block = document.getElementById('upload-block');
+        if (block.style.display === 'none' || block.style.display === '') {
+            block.style.display = 'block';
+        } else {
+            block.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

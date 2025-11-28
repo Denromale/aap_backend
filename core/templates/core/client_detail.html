@@ -1,0 +1,91 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Дані клієнта" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Дані клієнта" %}</h1>
+
+<h2>{% trans "Основні дані" %}</h2>
+<ul>
+    <li><strong>{% trans "Найменування:" %}</strong> {{ client.name }}</li>
+    <li><strong>{% trans "ЄДРПОУ:" %}</strong> {{ client.edrpou }}</li>
+</ul>
+
+<h2>{% trans "Адреса (місцезнаходження)" %}</h2>
+<ul>
+    <li><strong>{% trans "Країна:" %}</strong> {{ client.address_country }}</li>
+    <li><strong>{% trans "Місто:" %}</strong> {{ client.address_city }}</li>
+    <li><strong>{% trans "Вулиця:" %}</strong> {{ client.address_street }}</li>
+    <li><strong>{% trans "Будинок/корпус:" %}</strong> {{ client.address_building }}</li>
+    <li><strong>{% trans "Офіс:" %}</strong> {{ client.address_office }}</li>
+    <li><strong>{% trans "Індекс:" %}</strong> {{ client.address_zip }}</li>
+</ul>
+
+<h2>{% trans "КВЕД та ПОІ" %}</h2>
+<ul>
+    <li><strong>{% trans "КВЕД:" %}</strong> {{ client.kved }}</li>
+    <li>
+        <strong>{% trans "ПОІ:" %}</strong>
+        {% if client.poi %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+    </li>
+</ul>
+
+<h2>{% trans "Реквізити договору" %}</h2>
+<ul>
+    <li><strong>{% trans "№ договору/документа:" %}</strong> {{ client.requisites_number }}</li>
+    <li><strong>{% trans "Дата:" %}</strong> {{ client.requisites_date }}</li>
+    <li><strong>{% trans "Сума:" %}</strong> {{ client.requisites_amount }}</li>
+    <li><strong>{% trans "ПДВ:" %}</strong> {{ client.requisites_vat }}</li>
+</ul>
+
+<h2>{% trans "Нагляд, ОПФ, обов'язковий аудит" %}</h2>
+<ul>
+    <li><strong>{% trans "Орган нагляду:" %}</strong> {{ client.supervision_body }}</li>
+    <li><strong>{% trans "Організаційно-правова форма:" %}</strong> {{ client.legal_form }}</li>
+    <li>
+        <strong>{% trans "Обов'язковий аудит (огляд):" %}</strong>
+        {% if client.mandatory_audit %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+    </li>
+</ul>
+
+<h2>{% trans "Період та строк" %}</h2>
+<ul>
+    <li><strong>{% trans "Звітний період:" %}</strong> {{ client.reporting_period }}</li>
+    <li><strong>{% trans "Кінцевий строк виконання договору:" %}</strong> {{ client.contract_deadline }}</li>
+</ul>
+
+<h2>{% trans "Предмет завдання" %}</h2>
+<ul>
+    <li><strong>{% trans "Предмет завдання:" %}</strong> {{ client.engagement_subject }}</li>
+</ul>
+
+<h2>{% trans "Уповноважена особа клієнта" %}</h2>
+<ul>
+    <li><strong>{% trans "ПІБ:" %}</strong> {{ client.authorized_person_name }}</li>
+    <li><strong>Email:</strong> {{ client.authorized_person_email }}</li>
+</ul>
+
+<h2>{% trans "Дані аудиторського звіту" %}</h2>
+<ul>
+    <li><strong>{% trans "№ аудиторського звіту:" %}</strong> {{ client.audit_report_number }}</li>
+    <li><strong>{% trans "Дата аудиторського звіту:" %}</strong> {{ client.audit_report_date }}</li>
+    <li><strong>{% trans "Вид аудиторського звіту:" %}</strong> {{ client.audit_report_type }}</li>
+    <li><strong>{% trans "Параграф аудиторського звіту:" %}</strong> {{ client.audit_report_paragraph }}</li>
+    <li><strong>{% trans "Дата повідомлення до органу нагляду:" %}</strong> {{ client.supervision_notice_date }}</li>
+    <li>
+        <strong>{% trans "Контрольні процедури в CW виконані:" %}</strong>
+        {% if client.cw_controls_done %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+    </li>
+</ul>
+
+<h2>{% trans "Службова інформація" %}</h2>
+<ul>
+    <li><strong>{% trans "Статус:" %}</strong> {{ client.status }}</li>
+    <li><strong>{% trans "Створено:" %}</strong> {{ client.created_at }}</li>
+</ul>
+
+<p>
+    <a class="btn btn-secondary" href="{% url 'dashboard' %}">{% trans "Назад до списку" %}</a>
+</p>
+{% endblock %}

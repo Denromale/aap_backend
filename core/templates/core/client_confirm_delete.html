@@ -1,0 +1,24 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Видалити клієнта" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Видалити клієнта" %}</h1>
+
+<p>
+    {% blocktrans with client_name=client.name %}
+        Ви впевнені, що хочете видалити клієнта {{ client_name }}?
+    {% endblocktrans %}
+</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button class="btn btn-danger" type="submit">
+        {% trans "Так, видалити" %}
+    </button>
+    <a class="btn btn-secondary" href="{% url 'dashboard' %}">
+        {% trans "Скасувати" %}
+    </a>
+</form>
+{% endblock %}
