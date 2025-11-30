@@ -5,19 +5,44 @@
 {% block content %}
 <h1>База документів</h1>
 
-<form method="get" style="margin-bottom: 15px;">
-    <label for="client_id"><strong>Оберіть клієнта:</strong></label>
-    <select name="client_id"
-            id="client_id"
-            onchange="this.form.submit()"
-            style="width: 100%; max-width: 500px; padding: 6px; margin-top: 5px;">
-        {% for c in clients %}
-            <option value="{{ c.id }}"
-                    {% if selected_client and c.id == selected_client.id %}selected{% endif %}>
-                {{ c.name }}
-            </option>
-        {% endfor %}
-    </select>
+{# === Фільтр клієнта (4 залежні списки) === #}
+<form method="get" id="client_filter_form" style="margin-bottom: 15px;">
+    <label for="client_name_select">
+        <strong>Клієнт / період / договір / предмет:</strong>
+    </label>
+
+    <div style="display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap;">
+        <select id="client_name_select"
+                class="form-control"
+                style="flex: 2 1 240px;"></select>
+
+        <select id="client_period_select"
+                class="form-control"
+                style="flex: 1 1 140px;"
+                disabled></select>
+
+        <select id="client_contract_select"
+                class="form-control"
+                style="flex: 1 1 160px;"
+                disabled></select>
+
+        <select id="client_subject_select"
+                class="form-control"
+                style="flex: 2 1 240px;"
+                disabled></select>
+    </div>
+
+    <!-- сюда JS запишет id конкретного клієнта -->
+    <input type="hidden"
+           name="client_id"
+           id="client_id_hidden"
+           value="{{ selected_client.id|default:'' }}">
+
+    <button type="submit"
+            class="btn btn-primary"
+            style="margin-top: 10px;">
+        Показати документи
+    </button>
 </form>
 
 {% if selected_client %}
@@ -43,7 +68,6 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="upload">
 
-            
             <div style="margin-bottom: 10px;">
                 <label><strong>Файл:</strong></label><br>
                 <input type="file" name="file">
@@ -90,77 +114,73 @@
                 </tr>
             </thead>
             <tbody>
-                
                 {% for doc in documents %}
-    <tr>
-        <!-- 1. Название и ссылка на файл -->
-        <td style="border: 1px solid #ddd; padding: 6px;">
-            <a href="{{ doc.file.url }}" target="_blank">
-                {{ doc.original_name }}
-            </a>
-        </td>
+                <tr>
+                    <!-- 1. Название и ссылка на файл -->
+                    <td style="border: 1px solid #ddd; padding: 6px;">
+                        <a href="{{ doc.file.url }}" target="_blank">
+                            {{ doc.original_name }}
+                        </a>
+                    </td>
 
-        <!-- 2. ОДНА форма на строку: обновление + удаление -->
-        <form method="post" action="{% url 'document_update_type' doc.id %}">
-            {% csrf_token %}
+                    <!-- 2. ОДНА форма на строку: обновление + удаление -->
+                    <form method="post" action="{% url 'document_update_type' doc.id %}">
+                        {% csrf_token %}
 
-            <!-- Тип документа -->
-            <td style="border: 1px solid #ddd; padding: 6px;">
-                <select name="doc_type">
-                    <option value="">---------</option>
-                    {% for code, label in doc_type_choices %}
-                        <option value="{{ code }}"
-                                {% if doc.doc_type == code %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </td>
+                        <!-- Тип документа -->
+                        <td style="border: 1px solid #ddd; padding: 6px;">
+                            <select name="doc_type">
+                                <option value="">---------</option>
+                                {% for code, label in doc_type_choices %}
+                                    <option value="{{ code }}"
+                                            {% if doc.doc_type == code %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
 
-            <!-- Мітка -->
-            <td style="border: 1px solid #ddd; padding: 6px;">
-                <input type="text"
-                       name="custom_label"
-                       value="{{ doc.custom_label|default:'' }}"
-                       style="width: 100%;">
-            </td>
+                        <!-- Мітка -->
+                        <td style="border: 1px solid #ddd; padding: 6px;">
+                            <input type="text"
+                                   name="custom_label"
+                                   value="{{ doc.custom_label|default:'' }}"
+                                   style="width: 100%;">
+                        </td>
 
-            <!-- Дата -->
-            <td style="border: 1px solid #ddd; padding: 6px;">
-                {{ doc.created_at|date:"d.m.Y H:i" }}
-            </td>
+                        <!-- Дата -->
+                        <td style="border: 1px solid #ddd; padding: 6px;">
+                            {{ doc.created_at|date:"d.m.Y H:i" }}
+                        </td>
 
-            <!-- Користувач -->
-            <td style="border: 1px solid #ddd; padding: 6px;">
-                {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username|default:"" }}
-            </td>
+                        <!-- Користувач -->
+                        <td style="border: 1px solid #ddd; padding: 6px;">
+                            {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username|default:"" }}
+                        </td>
 
-            
-                    <!-- Дві кнопки в одному стовпчику -->
-        <td style="border: 1px solid #ddd; padding: 6px;">
+                        <!-- Дві кнопки в одному стовпчику -->
+                        <td style="border: 1px solid #ddd; padding: 6px;">
 
-            <!-- Кнопка "Зберегти" (оновити тип / мітку) -->
-            <button type="submit"
-                    style="padding: 4px 8px; border-radius: 4px; border: none;
-                           background: #1e88e5; color: #fff; cursor: pointer; margin-right: 6px;">
-                Зберегти
-            </button>
+                            <!-- Кнопка "Зберегти" (оновити тип / мітку) -->
+                            <button type="submit"
+                                    style="padding: 4px 8px; border-radius: 4px; border: none;
+                                           background: #1e88e5; color: #fff; cursor: pointer; margin-right: 6px;">
+                                Зберегти
+                            </button>
 
-            <!-- Кнопка "Видалити" (та ж форма, але інший URL) -->
-            <button type="submit"
-                    formaction="{% url 'document_delete' doc.id %}"
-                    onclick="return confirm('Видалити документ?');"
-                    style="padding: 4px 8px; border-radius: 4px; border: none;
-                           background: #e53935; color: #fff; cursor: pointer;">
-                Видалити
-            </button>
+                            <!-- Кнопка "Видалити" (та ж форма, але інший URL) -->
+                            <button type="submit"
+                                    formaction="{% url 'document_delete' doc.id %}"
+                                    onclick="return confirm('Видалити документ?');"
+                                    style="padding: 4px 8px; border-radius: 4px; border: none;
+                                           background: #e53935; color: #fff; cursor: pointer;">
+                                Видалити
+                            </button>
 
-        </td>
-
-        </form>
-    </tr>
-{% endfor %}
-
+                        </td>
+                    </form>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
     {% else %}
@@ -174,11 +194,190 @@
 <script>
     function toggleUploadBlock() {
         const block = document.getElementById('upload-block');
+        if (!block) return;
         if (block.style.display === 'none' || block.style.display === '') {
             block.style.display = 'block';
         } else {
             block.style.display = 'none';
         }
     }
+
+    // ===== Залежні списки для вибору клієнта (як на сторінці "Запити") =====
+    // CLIENTS прилетів із views.py як JSON
+    const CLIENTS = {{ clients_json|safe }};
+
+    const nameSelect = document.getElementById("client_name_select");
+    const periodSelect = document.getElementById("client_period_select");
+    const contractSelect = document.getElementById("client_contract_select");
+    const subjectSelect = document.getElementById("client_subject_select");
+    const hiddenClientId = document.getElementById("client_id_hidden");
+
+    function resetSelect(selectEl, placeholderText) {
+        selectEl.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholderText;
+        selectEl.appendChild(opt);
+        selectEl.disabled = true;
+    }
+
+    // 1) заполняем первый селект (имена клиентов)
+    function initNameSelect() {
+        const names = Array.from(
+            new Set(
+                CLIENTS
+                    .map(c => c.name)
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        resetSelect(nameSelect, "— виберіть клієнта —");
+        names.forEach(name => {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            nameSelect.appendChild(opt);
+        });
+        nameSelect.disabled = false;
+    }
+
+    // 2) при выборе имени – периоды
+    function onNameChange() {
+        const selectedName = nameSelect.value;
+
+        hiddenClientId.value = "";
+        resetSelect(periodSelect, "— період —");
+        resetSelect(contractSelect, "— договір —");
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName) return;
+
+        const filtered = CLIENTS.filter(c => c.name === selectedName);
+        const periods = Array.from(
+            new Set(
+                filtered
+                    .map(c => c.reporting_period)
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        if (!periods.length) return;
+
+        resetSelect(periodSelect, "— період —");
+        periods.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p;
+            opt.textContent = p;
+            periodSelect.appendChild(opt);
+        });
+        periodSelect.disabled = false;
+    }
+
+    // 3) при выборе периода – договоры
+    function onPeriodChange() {
+        const selectedName = nameSelect.value;
+        const selectedPeriod = periodSelect.value;
+
+        hiddenClientId.value = "";
+        resetSelect(contractSelect, "— договір —");
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName || !selectedPeriod) return;
+
+        const filtered = CLIENTS.filter(
+            c => c.name === selectedName && c.reporting_period === selectedPeriod
+        );
+
+        const contracts = Array.from(
+            new Set(
+                filtered
+                    .map(c => c.requisites_number)
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        if (!contracts.length) return;
+
+        resetSelect(contractSelect, "— договір —");
+        contracts.forEach(num => {
+            const opt = document.createElement("option");
+            opt.value = num;
+            opt.textContent = num;
+            contractSelect.appendChild(opt);
+        });
+        contractSelect.disabled = false;
+    }
+
+    // 4) при выборе договора – предметы задания
+    function onContractChange() {
+        const selectedName = nameSelect.value;
+        const selectedPeriod = periodSelect.value;
+        const selectedContract = contractSelect.value;
+
+        hiddenClientId.value = "";
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName || !selectedPeriod || !selectedContract) return;
+
+        const filtered = CLIENTS.filter(
+            c =>
+                c.name === selectedName &&
+                c.reporting_period === selectedPeriod &&
+                c.requisites_number === selectedContract
+        );
+
+        const subjects = Array.from(
+            new Set(
+                filtered
+                    .map(c => c.engagement_subject_display || c.engagement_subject)
+                    .filter(Boolean)
+            )
+        );
+
+        if (!subjects.length) return;
+
+        resetSelect(subjectSelect, "— предмет завдання —");
+        subjects.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = s;
+            subjectSelect.appendChild(opt);
+        });
+        subjectSelect.disabled = false;
+    }
+
+    // 5) при выборе предмета – записываем id клиента
+    function onSubjectChange() {
+        const selectedName = nameSelect.value;
+        const selectedPeriod = periodSelect.value;
+        const selectedContract = contractSelect.value;
+        const selectedSubjectText = subjectSelect.value;
+
+        if (!selectedName || !selectedPeriod || !selectedContract || !selectedSubjectText) {
+            hiddenClientId.value = "";
+            return;
+        }
+
+        const match = CLIENTS.find(
+            c =>
+                c.name === selectedName &&
+                c.reporting_period === selectedPeriod &&
+                c.requisites_number === selectedContract &&
+                (
+                    c.engagement_subject_display === selectedSubjectText ||
+                    c.engagement_subject === selectedSubjectText
+                )
+        );
+
+        hiddenClientId.value = match ? match.id : "";
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        initNameSelect();
+        nameSelect.addEventListener("change", onNameChange);
+        periodSelect.addEventListener("change", onPeriodChange);
+        contractSelect.addEventListener("change", onContractChange);
+        subjectSelect.addEventListener("change", onSubjectChange);
+    });
 </script>
 {% endblock %}

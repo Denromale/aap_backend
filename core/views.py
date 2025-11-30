@@ -16,7 +16,7 @@ from django.core.files.base import ContentFile
 
 from .models import Client, ClientDocument
 from .forms import ClientForm
-
+import json
 
 
 # ---------- helper для работы с DOCX ----------
@@ -334,6 +334,7 @@ def client_delete(request, pk):
 
 
 # ---------- Страница «Запити» / генерация DOCX ----------
+
 @login_required
 def requests_view(request):
     """
@@ -341,7 +342,7 @@ def requests_view(request):
     Одновременно сохраняем созданный документ в базу (ClientDocument),
     чтобы он появился в «Базі документів».
     """
-    # те же клиенты, что користувач бачить у dashboard
+    # ті ж клієнти, що користувач бачить у dashboard
     if request.user.is_superuser:
         clients = Client.objects.all().order_by("name")
     else:
@@ -361,6 +362,18 @@ def requests_view(request):
             .order_by("name")
         )
 
+    # данные для каскадных селектів (назва / період / договір / предмет)
+    clients_for_js = list(
+        clients.values(
+            "id",
+            "name",
+            "reporting_period",
+            "requisites_number",
+            "engagement_subject",
+        )
+    )
+    clients_json = json.dumps(clients_for_js, ensure_ascii=False)
+
     if request.method == "POST":
         client_id = request.POST.get("client_id")
         doc_type = request.POST.get("doc_type")
@@ -374,13 +387,12 @@ def requests_view(request):
         if doc_type == "remembrance_team":
             template_name = "remembrance_team.docx"
             download_name = f"remembrance_team_{client.id}.docx"
-            doc_type_code = "request"   # или свой код
+            doc_type_code = "request"   # або свій код
         elif doc_type == "team_independence":
             template_name = "team_independence.docx"
             download_name = f"team_independence_{client.id}.docx"
             doc_type_code = "request"
         elif doc_type == "order":
-            # ВАЖНО: тут раньше была ошибка — не нужно {client.id} в названии шаблона
             template_name = "order.docx"
             download_name = f"order_{client.id}.docx"
             doc_type_code = "request"
@@ -420,7 +432,7 @@ def requests_view(request):
         doc_record = ClientDocument(
             client=client,
             uploaded_by=request.user,
-            doc_type=doc_type_code,     # код типа, можно поменять
+            doc_type=doc_type_code,
             original_name=download_name,
         )
         # сохраняем файл в FileField
@@ -431,7 +443,14 @@ def requests_view(request):
         return redirect(f"{documents_url}?client_id={client.id}")
 
     # GET-запрос – просто показываем страницу
-    return render(request, "core/requests.html", {"clients": clients})
+    return render(
+        request,
+        "core/requests.html",
+        {
+            "clients": clients,
+            "clients_json": clients_json,
+        },
+    )
 
 
 @login_required
@@ -456,7 +475,21 @@ def documents_view(request):
             .order_by("name")
         )
 
-    # Если клиентов нет – просто показываем пустую страницу
+    # === JSON для залежних списків (як на сторінці "Запити") ===
+    clients_data = []
+    for c in clients:
+        clients_data.append({
+            "id": c.id,
+            "name": c.name or "",
+            "reporting_period": c.reporting_period or "",
+            "requisites_number": c.requisites_number or "",
+            "engagement_subject": c.engagement_subject or "",
+            "engagement_subject_display": c.get_engagement_subject_display() if c.engagement_subject else "",
+        })
+
+    clients_json = json.dumps(clients_data, ensure_ascii=False)
+
+    # Якщо клієнтів немає – віддаємо пусту сторінку, але з clients_json (щоб JS не падав)
     if not clients.exists():
         return render(
             request,
@@ -466,6 +499,7 @@ def documents_view(request):
                 "selected_client": None,
                 "documents": [],
                 "doc_type_choices": ClientDocument.DOC_TYPE_CHOICES,
+                "clients_json": clients_json,
             },
         )
 
@@ -510,10 +544,9 @@ def documents_view(request):
             "selected_client": selected_client,
             "documents": documents,
             "doc_type_choices": ClientDocument.DOC_TYPE_CHOICES,
+            "clients_json": clients_json,
         },
     )
-
-
 
 
 @login_required
@@ -546,6 +579,7 @@ def document_update_type(request, doc_id):
 
     return redirect(f"/documents/?client_id={client.id}")
 
+
 @login_required
 def document_delete(request, pk):
     """
@@ -571,6 +605,7 @@ def document_delete(request, pk):
 
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client_id}")
+
 
 # ---------- logout ----------
 

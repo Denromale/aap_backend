@@ -8,13 +8,34 @@
 <form method="post">
     {% csrf_token %}
 
+    <!-- Строка из 4 зависимых селектов -->
     <div style="margin-bottom: 15px;">
-        <label for="client_id"><strong>Оберіть клієнта:</strong></label>
-        <select name="client_id" id="client_id" style="width: 100%; padding: 6px; margin-top: 5px;">
-            {% for client in clients %}
-                <option value="{{ client.id }}">{{ client.name }}</option>
-            {% endfor %}
-        </select>
+        <label><strong>Клієнт / період / договір / предмет:</strong></label>
+
+        <div style="display: flex; gap: 8px; margin-top: 5px;">
+            <!-- 1. Клієнт -->
+            <select id="client_name_select" style="flex: 2; padding: 6px;">
+                <option value="">— виберіть клієнта —</option>
+            </select>
+
+            <!-- 2. Період -->
+            <select id="client_period_select" style="flex: 1; padding: 6px;" disabled>
+                <option value="">— період —</option>
+            </select>
+
+            <!-- 3. Договір -->
+            <select id="client_contract_select" style="flex: 1; padding: 6px;" disabled>
+                <option value="">— договір —</option>
+            </select>
+
+            <!-- 4. Предмет завдання -->
+            <select id="client_subject_select" style="flex: 2; padding: 6px;" disabled>
+                <option value="">— предмет завдання —</option>
+            </select>
+        </div>
+
+        <!-- сюда кладём id выбранного клиента -->
+        <input type="hidden" name="client_id" id="client_id_hidden">
     </div>
 
     <!-- Блоки запитів -->
@@ -36,7 +57,7 @@
             </div>
         </div>
 
-        <!-- 2. Анкета - опитувальник члена групи при прийнятті завдання, щодо незалежності -->
+        <!-- 2. Анкета -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;">
             <div>
                 <strong>Анкета - опитувальник члена групи при прийнятті завдання, щодо незалежності</strong><br>
@@ -70,4 +91,165 @@
 
     </div>
 </form>
+
+<!-- ВАЖНО: весь JS внутри <script>, иначе он печатается текстом -->
+<script>
+    // данные с бэкенда: [{id, name, reporting_period, requisites_number, engagement_subject, engagement_subject_display}, ...]
+    const CLIENTS = {{ clients_json|safe }};
+
+    const nameSelect     = document.getElementById("client_name_select");
+    const periodSelect   = document.getElementById("client_period_select");
+    const contractSelect = document.getElementById("client_contract_select");
+    const subjectSelect  = document.getElementById("client_subject_select");
+    const hiddenClientId = document.getElementById("client_id_hidden");
+
+    function resetSelect(selectEl, placeholderText) {
+        selectEl.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholderText;
+        selectEl.appendChild(opt);
+        selectEl.disabled = true;
+    }
+
+    // 1) имена клиентов
+    function initNameSelect() {
+        const names = Array.from(
+            new Set(
+                CLIENTS.map(c => c.name).filter(Boolean)
+            )
+        ).sort();
+
+        resetSelect(nameSelect, "— виберіть клієнта —");
+        names.forEach(name => {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            nameSelect.appendChild(opt);
+        });
+        nameSelect.disabled = false;
+    }
+
+    // 2) при выборе имени – периоды
+    function onNameChange() {
+        const selectedName = nameSelect.value;
+        hiddenClientId.value = "";
+        resetSelect(periodSelect, "— період —");
+        resetSelect(contractSelect, "— договір —");
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName) return;
+
+        const filtered = CLIENTS.filter(c => c.name === selectedName);
+        const periods = Array.from(
+            new Set(filtered.map(c => c.reporting_period).filter(Boolean))
+        ).sort();
+
+        if (periods.length) periodSelect.disabled = false;
+
+        periods.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p;
+            opt.textContent = p;
+            periodSelect.appendChild(opt);
+        });
+    }
+
+    // 3) при выборе периода – договоры
+    function onPeriodChange() {
+        const selectedName   = nameSelect.value;
+        const selectedPeriod = periodSelect.value;
+        hiddenClientId.value = "";
+        resetSelect(contractSelect, "— договір —");
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName || !selectedPeriod) return;
+
+        const filtered = CLIENTS.filter(
+            c => c.name === selectedName && c.reporting_period === selectedPeriod
+        );
+
+        const contracts = Array.from(
+            new Set(filtered.map(c => c.requisites_number).filter(Boolean))
+        ).sort();
+
+        if (contracts.length) contractSelect.disabled = false;
+
+        contracts.forEach(num => {
+            const opt = document.createElement("option");
+            opt.value = num;
+            opt.textContent = num;
+            contractSelect.appendChild(opt);
+        });
+    }
+
+    // 4) при выборе договора – предмети завдання
+    function onContractChange() {
+        const selectedName     = nameSelect.value;
+        const selectedPeriod   = periodSelect.value;
+        const selectedContract = contractSelect.value;
+        hiddenClientId.value   = "";
+        resetSelect(subjectSelect, "— предмет завдання —");
+
+        if (!selectedName || !selectedPeriod || !selectedContract) return;
+
+        const filtered = CLIENTS.filter(
+            c =>
+                c.name === selectedName &&
+                c.reporting_period === selectedPeriod &&
+                c.requisites_number === selectedContract
+        );
+
+        const subjects = Array.from(
+            new Set(
+                filtered
+                    .map(c => c.engagement_subject_display || c.engagement_subject)
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        if (subjects.length) subjectSelect.disabled = false;
+
+        subjects.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = s;
+            subjectSelect.appendChild(opt);
+        });
+
+        if (filtered.length === 1) {
+            hiddenClientId.value = filtered[0].id;
+        }
+    }
+
+    // 5) при выборе предмета – окончательно ставим client_id
+    function onSubjectChange() {
+        if (hiddenClientId.value) return;
+
+        const selectedName     = nameSelect.value;
+        const selectedPeriod   = periodSelect.value;
+        const selectedContract = contractSelect.value;
+        const selectedSubject  = subjectSelect.value;
+
+        const filtered = CLIENTS.filter(
+            c =>
+                c.name === selectedName &&
+                c.reporting_period === selectedPeriod &&
+                c.requisites_number === selectedContract &&
+                (c.engagement_subject_display === selectedSubject ||
+                 c.engagement_subject === selectedSubject)
+        );
+
+        if (filtered.length) {
+            hiddenClientId.value = filtered[0].id;
+        }
+    }
+
+    nameSelect.addEventListener("change", onNameChange);
+    periodSelect.addEventListener("change", onPeriodChange);
+    contractSelect.addEventListener("change", onContractChange);
+    subjectSelect.addEventListener("change", onSubjectChange);
+
+    initNameSelect();
+</script>
 {% endblock %}
