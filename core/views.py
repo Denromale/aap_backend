@@ -475,21 +475,7 @@ def documents_view(request):
             .order_by("name")
         )
 
-    # === JSON для залежних списків (як на сторінці "Запити") ===
-    clients_data = []
-    for c in clients:
-        clients_data.append({
-            "id": c.id,
-            "name": c.name or "",
-            "reporting_period": c.reporting_period or "",
-            "requisites_number": c.requisites_number or "",
-            "engagement_subject": c.engagement_subject or "",
-            "engagement_subject_display": c.get_engagement_subject_display() if c.engagement_subject else "",
-        })
-
-    clients_json = json.dumps(clients_data, ensure_ascii=False)
-
-    # Якщо клієнтів немає – віддаємо пусту сторінку, але з clients_json (щоб JS не падав)
+    # если вообще нет клиентов
     if not clients.exists():
         return render(
             request,
@@ -499,42 +485,63 @@ def documents_view(request):
                 "selected_client": None,
                 "documents": [],
                 "doc_type_choices": ClientDocument.DOC_TYPE_CHOICES,
-                "clients_json": clients_json,
+                "clients_json": "[]",
             },
         )
 
-    # 2. Определяем выбранного клиента
+    # ---------- данные для JS (зависимые списки) ----------
+    clients_list = []
+    for c in clients:
+        clients_list.append(
+            {
+                "id": c.id,
+                "name": c.name or "",
+                "reporting_period": c.reporting_period or "",
+                "requisites_number": c.requisites_number or "",
+                "engagement_subject": c.engagement_subject or "",
+                "engagement_subject_display": c.get_engagement_subject_display()
+                if c.engagement_subject
+                else "",
+            }
+        )
+    clients_json = json.dumps(clients_list, ensure_ascii=False)
+
+    # ---------- определяем выбранного клиента ----------
     client_id = request.GET.get("client_id")
+    selected_client = None
     if client_id:
         selected_client = clients.filter(id=client_id).first()
-        # если по id ничего не нашли (нет доступа/ошибка) – берём первого
-        if selected_client is None:
-            selected_client = clients.first()
-    else:
-        # при первом заходе – автоматически первый клиент
-        selected_client = clients.first()
 
-    # 3. Обработка загрузки файла (POST)
+    # ---------- загрузка файла (POST) ----------
     if request.method == "POST" and request.POST.get("action") == "upload":
-        file = request.FILES.get("file")
-        if file:
-            ClientDocument.objects.create(
-                client=selected_client,
-                file=file,
-                original_name=file.name,
-                uploaded_by=request.user,
-                doc_type=request.POST.get("doc_type") or "",
-                custom_label=request.POST.get("label") or "",
-            )
-        # всегда редиректим, чтобы не было повторной отправки формы
-        docs_url = reverse("documents")
-        return redirect(f"{docs_url}?client_id={selected_client.id}")
+        # сюда придём только когда уже выбран клиент,
+        # форма отправляется с ?client_id=...
+        if selected_client:
+            file = request.FILES.get("file")
+            if file:
+                ClientDocument.objects.create(
+                    client=selected_client,
+                    file=file,
+                    original_name=file.name,
+                    uploaded_by=request.user,
+                    doc_type=request.POST.get("doc_type") or "",
+                    custom_label=request.POST.get("label") or "",
+                )
 
-    # 4. Список документов выбранного клиента (GET)
-    documents = (
-        ClientDocument.objects.filter(client=selected_client)
-        .order_by("-created_at")
-    )
+        docs_url = reverse("documents")
+        if selected_client:
+            return redirect(f"{docs_url}?client_id={selected_client.id}")
+        else:
+            return redirect(docs_url)
+
+    # ---------- список документов выбранного клиента ----------
+    if selected_client:
+        documents = (
+            ClientDocument.objects.filter(client=selected_client)
+            .order_by("-created_at")
+        )
+    else:
+        documents = []
 
     return render(
         request,
@@ -547,6 +554,7 @@ def documents_view(request):
             "clients_json": clients_json,
         },
     )
+
 
 
 @login_required
