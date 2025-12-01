@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from decimal import Decimal, ROUND_HALF_UP
 
+
 from io import BytesIO
 from docx import Document
 from django.utils import timezone
@@ -51,13 +52,15 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
 
 
 # ---------- базовые вьюхи ----------
-
+@login_required(login_url='login')
 def home(request):
     """
     Головна сторінка AAP.
     Доступна тільки авторизованим користувачам.
     """
     return render(request, "core/home.html")
+
+
 
 
 def login_view(request):
@@ -629,4 +632,4 @@ def document_delete(request, pk):
 
 def logout_view(request):
     logout(request)
-    return redirect("home")
+    return redirect("login")
