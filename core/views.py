@@ -277,20 +277,14 @@ def client_detail(request, pk):
         ):
             return redirect("dashboard")
 
-    form = ClientForm(instance=client)
-    # делаем форму read-only
-    for field in form.fields.values():
-        field.disabled = True
-
     return render(
         request,
-        "core/client_form.html",
+        "core/client_detail.html",
         {
-            "form": form,
             "client": client,
-            "read_only": True,
         },
     )
+
 
 
 @login_required

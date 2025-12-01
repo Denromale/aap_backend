@@ -1,5 +1,10 @@
 /* ===== БАЗА ===== */
 
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
 body.app-body {
     margin: 0;
     padding: 0;
@@ -11,17 +16,20 @@ body.app-body {
 /* Контейнер приложения: левая панель + правая часть */
 .app-shell {
     display: flex;
-    min-height: 100vh;
 }
 
-/* ===== САЙДБАР ===== */
+/* ===== САЙДБАР (фиксированный слева) ===== */
 
 .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 240px;
-    background: #0f172a;       /* тёмно-синий / почти чёрный */
+    height: 100vh;            /* на всю высоту экрана */
+    background: #0f172a;      /* тёмно-синий / почти чёрный */
     color: #e5e7eb;
     display: flex;
-    flex-direction: column;
+    flex-direction: column;   /* чтобы низ можно было прижать */
     padding: 16px 12px;
     box-sizing: border-box;
 }
@@ -83,9 +91,9 @@ body.app-body {
     color: #ffffff;
 }
 
-/* нижний блок сайдбара с выходом */
+/* нижний блок сайдбара с выходом — ПРИЖАТ К НИЗУ */
 .sidebar-bottom {
-    margin-top: auto;
+    margin-top: auto;  /* это и прижимает блок к низу */
     padding-top: 12px;
     border-top: 1px solid rgba(148, 163, 184, 0.4);
 }
@@ -101,10 +109,13 @@ body.app-body {
 /* ===== ПРАВАЯ ЧАСТЬ ===== */
 
 .app-main {
+    margin-left: 240px;       /* сдвигаем вправо на ширину сайдбара */
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 100vh;
+    background: #f3f4f6;
 }
 
 /* Верхняя панель (topbar) */
@@ -180,7 +191,7 @@ body.app-body {
     box-sizing: border-box;
 }
 
-/* Карточка страницы (как блок в примере "Add new car") */
+/* Карточка страницы */
 .page-card {
     max-width: 1200px;
     margin: 0 auto;
@@ -192,14 +203,13 @@ body.app-body {
         0 4px 6px -4px rgba(15, 23, 42, 0.05);
 }
 
-/* Заголовки внутри карточек */
 .page-card h1,
 .page-card h2,
 .page-card h3 {
     margin-top: 0;
 }
 
-/* ===== ТАБЛИЦЫ (список клиентов, документы и т.п.) ===== */
+/* ===== ТАБЛИЦЫ ===== */
 
 table {
     width: 100%;
@@ -223,12 +233,11 @@ th {
     color: #4b5563;
 }
 
-/* Чередование строк для лучшей читаемости */
 tbody tr:nth-child(even) {
     background: #f9fafb;
 }
 
-/* ===== ФОРМЫ и ИНПУТЫ ===== */
+/* ===== ФОРМЫ ===== */
 
 label {
     font-size: 14px;
@@ -264,7 +273,6 @@ textarea:focus {
     box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 
-/* Поля в форме клиента / запитів можно располагать на сетке */
 .form-row {
     display: flex;
     gap: 16px;
@@ -313,7 +321,7 @@ input[type="submit"].btn-primary {
     background: #d1d5db;
 }
 
-/* Ссылки-действия в таблицах (Дані | Команда | Змінити | Видалити) */
+/* Ссылки-действия в таблицах */
 .table-action-link {
     color: #2563eb;
     text-decoration: none;
@@ -322,18 +330,6 @@ input[type="submit"].btn-primary {
 
 .table-action-link:hover {
     text-decoration: underline;
-}
-
-/* ===== СПЕЦИФИКА ДЛЯ БАЗЫ ДОКУМЕНТОВ ===== */
-
-#upload-block {
-    background: #f9fafb;
-}
-
-/* Разнести кнопки "Зберегти" и "Видалити" чуть дальше друг от друга */
-.doc-actions {
-    display: inline-flex;
-    gap: 8px;
 }
 
 /* Красная кнопка удаления */
@@ -345,42 +341,80 @@ input[type="submit"].btn-primary {
 .btn-danger:hover {
     background: #dc2626;
 }
+/* --- фиксированный сайдбар и кнопка Вийти внизу --- */
 
-/* ===== АДАПТИВ НА УЗКИХ ЭКРАНАХ ===== */
-
-@media (max-width: 1024px) {
-    .sidebar {
-        width: 220px;
-    }
-
-    .page-card {
-        padding: 20px;
-    }
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-@media (max-width: 768px) {
-    .app-shell {
-        flex-direction: column;
-    }
+.sidebar-top {
+    /* верхнюю часть просто оставляем как есть */
+}
 
-    .sidebar {
-        width: 100%;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-    }
+.sidebar-bottom {
+    margin-top: auto;      /* прижимает блок с "Вийти" к низу сайдбара */
+}
 
-    .sidebar-nav {
-        flex-direction: row;
-        gap: 8px;
-    }
+/* правая часть смещается вправо на ширину сайдбара */
+.app-main {
+    margin-left: 240px;
+}
+/* ===== Секции "Дані клієнта" (аккордеон) ===== */
 
-    .sidebar-bottom {
-        border-top: none;
-        margin-top: 0;
-    }
+.client-sections {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
-    .app-main {
-        min-height: calc(100vh - 60px);
-    }
+.client-section {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px 16px 12px;
+    box-shadow:
+        0 10px 15px -3px rgba(15, 23, 42, 0.08),
+        0 4px 6px -4px rgba(15, 23, 42, 0.05);
+}
+
+.client-section-header {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+}
+
+.client-section-chevron {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+/* по умолчанию тело скрыто */
+.client-section--collapsed .client-section-body {
+    display: none;
+}
+
+.client-section-body ul {
+    margin: 8px 0 0 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.client-section-body li {
+    margin-bottom: 4px;
+    font-size: 14px;
 }

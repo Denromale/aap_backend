@@ -15,38 +15,41 @@
 <div class="app-shell">
     <!-- ЛЕВА ПАНЕЛЬ -->
     <aside class="sidebar">
-        <div class="sidebar-logo">
-            <span class="sidebar-logo-icon">A</span>
-            <span class="sidebar-logo-text">AAP</span>
+        <div class="sidebar-top">
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon">A</span>
+                <span class="sidebar-logo-text">AAP</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{% url 'home' %}"
+                   class="sidebar-link{% if request.resolver_match.url_name == 'home' %} is-active{% endif %}">
+                    Головна
+                </a>
+                <a href="{% url 'dashboard' %}"
+                   class="sidebar-link{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}">
+                    Список клієнтів
+                </a>
+                <a href="{% url 'requests' %}"
+                   class="sidebar-link{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
+                    Запити
+                </a>
+                <a href="{% url 'documents' %}"
+                   class="sidebar-link{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
+                    База документів
+                </a>
+            </nav>
         </div>
 
-        <nav class="sidebar-nav">
-            <a href="{% url 'home' %}"
-               class="sidebar-link{% if request.resolver_match.url_name == 'home' %} is-active{% endif %}">
-                Головна
-            </a>
-            <a href="{% url 'dashboard' %}"
-               class="sidebar-link{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}">
-                Список клієнтів
-            </a>
-            <a href="{% url 'requests' %}"
-               class="sidebar-link{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
-                Запити
-            </a>
-            <a href="{% url 'documents' %}"
-               class="sidebar-link{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
-                База документів
-            </a>
-        </nav>
-        
-
         <div class="sidebar-bottom">
-            <form action="{% url 'logout' %}" method="post">
-                {% csrf_token %}
-                <button class="sidebar-link sidebar-logout" type="submit">
-                    Вийти
-                </button>
-            </form>
+            {% if request.user.is_authenticated %}
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button class="sidebar-link sidebar-logout" type="submit">
+                        Вийти
+                    </button>
+                </form>
+            {% endif %}
         </div>
     </aside>
 

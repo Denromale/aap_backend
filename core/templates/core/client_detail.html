@@ -3,89 +3,192 @@
 
 {% block title %}{% trans "Дані клієнта" %}{% endblock %}
 
+{% block page_title %}
+    <h1 class="topbar-title">
+        {% trans "Дані клієнта" %}: {{ client.name }}
+    </h1>
+{% endblock %}
+
 {% block content %}
-<h1>{% trans "Дані клієнта" %}</h1>
 
-<h2>{% trans "Основні дані" %}</h2>
-<ul>
-    <li><strong>{% trans "Найменування:" %}</strong> {{ client.name }}</li>
-    <li><strong>{% trans "ЄДРПОУ:" %}</strong> {{ client.edrpou }}</li>
-</ul>
+<div class="client-sections">
 
-<h2>{% trans "Адреса (місцезнаходження)" %}</h2>
-<ul>
-    <li><strong>{% trans "Країна:" %}</strong> {{ client.address_country }}</li>
-    <li><strong>{% trans "Місто:" %}</strong> {{ client.address_city }}</li>
-    <li><strong>{% trans "Вулиця:" %}</strong> {{ client.address_street }}</li>
-    <li><strong>{% trans "Будинок/корпус:" %}</strong> {{ client.address_building }}</li>
-    <li><strong>{% trans "Офіс:" %}</strong> {{ client.address_office }}</li>
-    <li><strong>{% trans "Індекс:" %}</strong> {{ client.address_zip }}</li>
-</ul>
+    <!-- Основні дані -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Основні дані" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Найменування:" %}</strong> {{ client.name }}</li>
+                <li><strong>{% trans "ЄДРПОУ:" %}</strong> {{ client.edrpou }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "КВЕД та ПОІ" %}</h2>
-<ul>
-    <li><strong>{% trans "КВЕД:" %}</strong> {{ client.kved }}</li>
-    <li>
-        <strong>{% trans "ПОІ:" %}</strong>
-        {% if client.poi %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
-    </li>
-</ul>
+    <!-- Адреса -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Адреса (місцезнаходження)" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Країна:" %}</strong> {{ client.address_country }}</li>
+                <li><strong>{% trans "Місто:" %}</strong> {{ client.address_city }}</li>
+                <li><strong>{% trans "Вулиця:" %}</strong> {{ client.address_street }}</li>
+                <li><strong>{% trans "Будинок/корпус:" %}</strong> {{ client.address_building }}</li>
+                <li><strong>{% trans "Офіс:" %}</strong> {{ client.address_office }}</li>
+                <li><strong>{% trans "Індекс:" %}</strong> {{ client.address_zip }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Реквізити договору" %}</h2>
-<ul>
-    <li><strong>{% trans "№ договору/документа:" %}</strong> {{ client.requisites_number }}</li>
-    <li><strong>{% trans "Дата:" %}</strong> {{ client.requisites_date }}</li>
-    <li><strong>{% trans "Сума:" %}</strong> {{ client.requisites_amount }}</li>
-    <li><strong>{% trans "ПДВ:" %}</strong> {{ client.requisites_vat }}</li>
-</ul>
+    <!-- КВЕД та ПОІ -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "КВЕД та ПОІ" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "КВЕД:" %}</strong> {{ client.kved }}</li>
+                <li>
+                    <strong>{% trans "ПОІ:" %}</strong>
+                    {% if client.poi %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+                </li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Нагляд, ОПФ, обов'язковий аудит" %}</h2>
-<ul>
-    <li><strong>{% trans "Орган нагляду:" %}</strong> {{ client.supervision_body }}</li>
-    <li><strong>{% trans "Організаційно-правова форма:" %}</strong> {{ client.legal_form }}</li>
-    <li>
-        <strong>{% trans "Обов'язковий аудит (огляд):" %}</strong>
-        {% if client.mandatory_audit %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
-    </li>
-</ul>
+    <!-- Реквізити договору -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Реквізити договору" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "№ договору/документа:" %}</strong> {{ client.requisites_number }}</li>
+                <li><strong>{% trans "Дата:" %}</strong> {{ client.requisites_date }}</li>
+                <li><strong>{% trans "Сума:" %}</strong> {{ client.requisites_amount }}</li>
+                <li><strong>{% trans "ПДВ:" %}</strong> {{ client.requisites_vat }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Період та строк" %}</h2>
-<ul>
-    <li><strong>{% trans "Звітний період:" %}</strong> {{ client.reporting_period }}</li>
-    <li><strong>{% trans "Кінцевий строк виконання договору:" %}</strong> {{ client.contract_deadline }}</li>
-</ul>
+    <!-- Нагляд, ОПФ, обов'язковий аудит -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Нагляд, ОПФ, обов'язковий аудит" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Орган нагляду:" %}</strong> {{ client.supervision_body }}</li>
+                <li><strong>{% trans "Організаційно-правова форма:" %}</strong> {{ client.legal_form }}</li>
+                <li>
+                    <strong>{% trans "Обов'язковий аудит (огляд):" %}</strong>
+                    {% if client.mandatory_audit %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+                </li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Предмет завдання" %}</h2>
-<ul>
-    <li><strong>{% trans "Предмет завдання:" %}</strong> {{ client.engagement_subject }}</li>
-</ul>
+    <!-- Період та строк -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Період та строк" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Звітний період:" %}</strong> {{ client.reporting_period }}</li>
+                <li><strong>{% trans "Кінцевий строк виконання договору:" %}</strong> {{ client.contract_deadline }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Уповноважена особа клієнта" %}</h2>
-<ul>
-    <li><strong>{% trans "ПІБ:" %}</strong> {{ client.authorized_person_name }}</li>
-    <li><strong>Email:</strong> {{ client.authorized_person_email }}</li>
-</ul>
+    <!-- Предмет завдання -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Предмет завдання" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Предмет завдання:" %}</strong> {{ client.engagement_subject }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Дані аудиторського звіту" %}</h2>
-<ul>
-    <li><strong>{% trans "№ аудиторського звіту:" %}</strong> {{ client.audit_report_number }}</li>
-    <li><strong>{% trans "Дата аудиторського звіту:" %}</strong> {{ client.audit_report_date }}</li>
-    <li><strong>{% trans "Вид аудиторського звіту:" %}</strong> {{ client.audit_report_type }}</li>
-    <li><strong>{% trans "Параграф аудиторського звіту:" %}</strong> {{ client.audit_report_paragraph }}</li>
-    <li><strong>{% trans "Дата повідомлення до органу нагляду:" %}</strong> {{ client.supervision_notice_date }}</li>
-    <li>
-        <strong>{% trans "Контрольні процедури в CW виконані:" %}</strong>
-        {% if client.cw_controls_done %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
-    </li>
-</ul>
+    <!-- Уповноважена особа -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Уповноважена особа клієнта" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "ПІБ:" %}</strong> {{ client.authorized_person_name }}</li>
+                <li><strong>Email:</strong> {{ client.authorized_person_email }}</li>
+            </ul>
+        </div>
+    </section>
 
-<h2>{% trans "Службова інформація" %}</h2>
-<ul>
-    <li><strong>{% trans "Статус:" %}</strong> {{ client.status }}</li>
-    <li><strong>{% trans "Створено:" %}</strong> {{ client.created_at }}</li>
-</ul>
+    <!-- Дані аудиторського звіту -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Дані аудиторського звіту" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "№ аудиторського звіту:" %}</strong> {{ client.audit_report_number }}</li>
+                <li><strong>{% trans "Дата аудиторського звіту:" %}</strong> {{ client.audit_report_date }}</li>
+                <li><strong>{% trans "Вид аудиторського звіту:" %}</strong> {{ client.audit_report_type }}</li>
+                <li><strong>{% trans "Параграф аудиторського звіту:" %}</strong> {{ client.audit_report_paragraph }}</li>
+                <li><strong>{% trans "Дата повідомлення до органу нагляду:" %}</strong> {{ client.supervision_notice_date }}</li>
+                <li>
+                    <strong>{% trans "Контрольні процедури в CW виконані:" %}</strong>
+                    {% if client.cw_controls_done %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+                </li>
+            </ul>
+        </div>
+    </section>
 
-<p>
-    <a class="btn btn-secondary" href="{% url 'dashboard' %}">{% trans "Назад до списку" %}</a>
+    <!-- Службова інформація -->
+    <section class="client-section client-section--collapsed">
+        <button type="button" class="client-section-header">
+            <span>{% trans "Службова інформація" %}</span>
+            <span class="client-section-chevron">▼</span>
+        </button>
+        <div class="client-section-body">
+            <ul>
+                <li><strong>{% trans "Статус:" %}</strong> {{ client.status }}</li>
+                <li><strong>{% trans "Створено:" %}</strong> {{ client.created_at }}</li>
+            </ul>
+        </div>
+    </section>
+
+</div>
+
+<p style="margin-top: 16px;">
+    <a class="btn btn-secondary" href="{% url 'dashboard' %}">
+        {% trans "Назад до списку" %}
+    </a>
 </p>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.client-section-header').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const section = this.closest('.client-section');
+            section.classList.toggle('client-section--collapsed');
+        });
+    });
+});
+</script>
+
 {% endblock %}
