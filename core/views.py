@@ -53,12 +53,17 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
 # ---------- базовые вьюхи ----------
 
 def home(request):
+    """
+    Головна сторінка AAP.
+    Доступна тільки авторизованим користувачам.
+    """
     return render(request, "core/home.html")
 
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        # уже вошёл – сразу на главную
+        return redirect("home")
 
     error = None
 
@@ -70,7 +75,12 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            return redirect("dashboard")
+
+            # если был параметр next – идём туда, иначе на home
+            next_url = request.GET.get("next")
+            if next_url:
+                return redirect(next_url)
+            return redirect("home")
         else:
             error = "Неверный логин или пароль"
 

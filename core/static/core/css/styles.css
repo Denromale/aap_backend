@@ -1,4 +1,4 @@
-/* ТВОЙ СТАРЫЙ КЛАСС – ОСТАВЛЯЕМ */
+/* --- старый класс оставляем --- */
 .client-select {
     font-family: "Consolas", "Fira Code", monospace;
     white-space: pre;
@@ -6,28 +6,30 @@
 
 /* ---------- ОФОРМЛЕНИЕ СТРАНИЦЫ ЛОГИНА ---------- */
 
-body {
+/* только для страницы логина (body class="login-body") */
+.login-body {
+    margin: 0;
     background: #F3F4F6;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Обёртка логина (внутри base.html) */
+/* Обёртка логина: центрируем карточку, убираем лишний скролл */
 .login-page {
-    min-height: calc(100vh - 58px); /* минус верхний синий бар */
+    min-height: calc(100vh - 58px); /* высота экрана минус верхний синій бар */
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 32px 16px;
+    padding: 24px 16px;
+    box-sizing: border-box;
 }
 
-/* Двухколоночная карточка как на референсе */
 .login-card-2col {
     display: flex;
     width: 900px;
     max-width: 100%;
     background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
     overflow: hidden;
 }
 
@@ -36,6 +38,7 @@ body {
     width: 50%;
     padding: 36px 40px;
     background: #ffffff;
+    box-sizing: border-box;
 }
 
 .login-title {
@@ -59,6 +62,7 @@ body {
     border: 1px solid #E5E7EB;
     padding: 10px 12px;
     margin-bottom: 16px;
+    box-sizing: border-box;
 }
 
 .login-form .input-icon {
@@ -80,7 +84,7 @@ body {
     outline: none;
 }
 
-/* строка "запомнить / забыли пароль" */
+/* строка "запам’ятати / забули" */
 .extra-row {
     display: flex;
     justify-content: space-between;
@@ -122,11 +126,10 @@ body {
 /* Правая синяя панель */
 .login-right {
     width: 50%;
-    background: linear-gradient(135deg, #0F52D9, #1D4ED8);
+    background: url('/static/core/img/login-bg.png') center/cover no-repeat;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
 }
 
 .login-right-content {

@@ -1,33 +1,62 @@
 {% extends "core/base.html" %}
-{% load i18n %}
 
-{% block title %}AAP – {% trans "Головна" %}{% endblock %}
+{% block title %}Головна – AAP{% endblock %}
+
+{% block page_title %}
+    <h1 class="topbar-title">Головна</h1>
+{% endblock %}
 
 {% block content %}
-<h1>{% trans "Головна сторінка AAP" %}</h1>
+    <h2 style="margin-top: 0; margin-bottom: 12px;">Головна сторінка AAP</h2>
 
-{% if user.is_authenticated %}
-    <p>
-        {% blocktrans with username=user.username %}
-            Ви увійшли як {{ username }}.
-        {% endblocktrans %}
-    </p>
-    <p>
-        <a class="btn btn-primary" href="{% url 'dashboard' %}">
-            {% trans "Перейти до особистого кабінету" %}
+    {% if request.user.is_authenticated %}
+        <p style="margin-bottom: 16px;">
+            Ви увійшли як <strong>{{ request.user.get_username }}</strong>.
+        </p>
+
+        <a href="{% url 'dashboard' %}"
+           style="
+               display: inline-block;
+               padding: 8px 16px;
+               border-radius: 8px;
+               background: #2563eb;
+               color: #fff;
+               text-decoration: none;
+               font-size: 14px;
+               margin-right: 8px;
+           ">
+            Перейти до особистого кабінету
         </a>
-    </p>
-    <p>
-        <a class="btn btn-secondary" href="{% url 'logout' %}">
-            {% trans "Вийти" %}
+
+        <form action="{% url 'logout' %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit"
+                    style="
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        border: 1px solid #d1d5db;
+                        background: #f9fafb;
+                        font-size: 14px;
+                        cursor: pointer;
+                    ">
+                Вийти
+            </button>
+        </form>
+    {% else %}
+        <p style="margin-bottom: 16px;">
+            Ви не авторизовані.
+        </p>
+        <a href="{% url 'login' %}"
+           style="
+               display: inline-block;
+               padding: 8px 16px;
+               border-radius: 8px;
+               background: #2563eb;
+               color: #fff;
+               text-decoration: none;
+               font-size: 14px;
+           ">
+            Увійти
         </a>
-    </p>
-{% else %}
-    <p>{% trans "Ви не авторизовані." %}</p>
-    <p>
-        <a class="btn btn-primary" href="{% url 'login' %}">
-            {% trans "Увійти" %}
-        </a>
-    </p>
-{% endif %}
+    {% endif %}
 {% endblock %}

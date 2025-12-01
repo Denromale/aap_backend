@@ -1,0 +1,386 @@
+/* ===== БАЗА ===== */
+
+body.app-body {
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f3f4f6; /* светло-серый фон как в современных админках */
+    color: #111827;
+}
+
+/* Контейнер приложения: левая панель + правая часть */
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ===== САЙДБАР ===== */
+
+.sidebar {
+    width: 240px;
+    background: #0f172a;       /* тёмно-синий / почти чёрный */
+    color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    box-sizing: border-box;
+}
+
+/* Логотип в сайдбаре */
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 16px;
+    border-bottom: 1px solid rgba(249, 250, 251, 0.08);
+    margin-bottom: 8px;
+}
+
+.sidebar-logo-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #38bdf8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    color: #ffffff;
+}
+
+.sidebar-logo-text {
+    font-weight: 600;
+    font-size: 18px;
+}
+
+/* Навигация в сайдбаре */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    padding-top: 8px;
+}
+
+.sidebar-link {
+    display: block;
+    padding: 8px 10px;
+    margin: 2px 0;
+    border-radius: 8px;
+    font-size: 14px;
+    text-decoration: none;
+    color: #e5e7eb;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-link:hover {
+    background: rgba(148, 163, 184, 0.25);
+    color: #ffffff;
+}
+
+/* активный пункт меню */
+.sidebar-link.is-active {
+    background: rgba(59, 130, 246, 0.25);
+    color: #ffffff;
+}
+
+/* нижний блок сайдбара с выходом */
+.sidebar-bottom {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.sidebar-logout {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+/* ===== ПРАВАЯ ЧАСТЬ ===== */
+
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Верхняя панель (topbar) */
+.topbar {
+    height: 60px;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    box-sizing: border-box;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.topbar-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Блок пользователя справа */
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.topbar-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.topbar-user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.topbar-user-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.topbar-user-role {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+/* ===== КОНТЕНТ ===== */
+
+.main-content {
+    padding: 24px 32px 32px;
+    box-sizing: border-box;
+}
+
+/* Карточка страницы (как блок в примере "Add new car") */
+.page-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px 24px 28px;
+    box-shadow:
+        0 10px 15px -3px rgba(15, 23, 42, 0.08),
+        0 4px 6px -4px rgba(15, 23, 42, 0.05);
+}
+
+/* Заголовки внутри карточек */
+.page-card h1,
+.page-card h2,
+.page-card h3 {
+    margin-top: 0;
+}
+
+/* ===== ТАБЛИЦЫ (список клиентов, документы и т.п.) ===== */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+thead {
+    background: #f9fafb;
+}
+
+th,
+td {
+    border: 1px solid #e5e7eb;
+    padding: 8px 10px;
+    text-align: left;
+}
+
+th {
+    font-weight: 600;
+    color: #4b5563;
+}
+
+/* Чередование строк для лучшей читаемости */
+tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+/* ===== ФОРМЫ и ИНПУТЫ ===== */
+
+label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="password"],
+select,
+textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+/* Поля в форме клиента / запитів можно располагать на сетке */
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.form-col {
+    flex: 1;
+}
+
+/* ===== КНОПКИ ===== */
+
+.btn,
+button,
+input[type="submit"] {
+    font-size: 14px;
+    border-radius: 6px;
+    padding: 6px 12px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+/* Основная кнопка */
+.btn-primary,
+button.btn-primary,
+input[type="submit"].btn-primary {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+}
+
+/* Серый вариант */
+.btn-secondary {
+    background: #e5e7eb;
+    color: #111827;
+}
+
+.btn-secondary:hover {
+    background: #d1d5db;
+}
+
+/* Ссылки-действия в таблицах (Дані | Команда | Змінити | Видалити) */
+.table-action-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.table-action-link:hover {
+    text-decoration: underline;
+}
+
+/* ===== СПЕЦИФИКА ДЛЯ БАЗЫ ДОКУМЕНТОВ ===== */
+
+#upload-block {
+    background: #f9fafb;
+}
+
+/* Разнести кнопки "Зберегти" и "Видалити" чуть дальше друг от друга */
+.doc-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+/* Красная кнопка удаления */
+.btn-danger {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* ===== АДАПТИВ НА УЗКИХ ЭКРАНАХ ===== */
+
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 220px;
+    }
+
+    .page-card {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-shell {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .sidebar-bottom {
+        border-top: none;
+        margin-top: 0;
+    }
+
+    .app-main {
+        min-height: calc(100vh - 60px);
+    }
+}
