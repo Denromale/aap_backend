@@ -230,3 +230,19 @@ class ClientDocument(models.Model):
 
     def __str__(self):
         return self.original_name or f"Документ #{self.pk}"
+
+from django.db import models
+
+class News(models.Model):
+    title = models.CharField("Заголовок", max_length=255)
+    body = models.TextField("Текст", blank=True)
+    image = models.ImageField("Зображення", upload_to='news/', blank=True, null=True)  # ← добавили
+    link = models.URLField("Ссылка (опціонально)", blank=True)
+    is_published = models.BooleanField("Опубліковано", default=True)
+    created_at = models.DateTimeField("Створено", auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title

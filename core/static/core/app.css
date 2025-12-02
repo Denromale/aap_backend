@@ -418,3 +418,20 @@ input[type="submit"].btn-primary {
     margin-bottom: 4px;
     font-size: 14px;
 }
+
+.questionnaire-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.questionnaire-table th,
+.questionnaire-table td {
+    border: 1px solid #e5e7eb;
+    padding: 8px 10px;
+}
+
+.questionnaire-table thead {
+    background: #f9fafb;
+    font-weight: 600;
+}

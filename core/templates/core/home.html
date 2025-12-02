@@ -7,13 +7,12 @@
 {% endblock %}
 
 {% block content %}
+    
+
     <h2 style="margin-top: 0; margin-bottom: 12px;">Головна сторінка AAP</h2>
 
     {% if request.user.is_authenticated %}
-        <p style="margin-bottom: 16px;">
-            Ви увійшли як <strong>{{ request.user.get_username }}</strong>.
-        </p>
-
+        
         <a href="{% url 'dashboard' %}"
            style="
                display: inline-block;
@@ -28,20 +27,96 @@
             Перейти до особистого кабінету
         </a>
 
-        <form action="{% url 'logout' %}" method="post" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit"
-                    style="
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        border: 1px solid #d1d5db;
-                        background: #f9fafb;
-                        font-size: 14px;
+
+
+        <!-- БЛОК НОВИН -->
+        <div style="margin-top: 32px; padding: 24px; border-radius: 16px; background: #ffffff; border: 1px solid #e5e7eb;">
+            <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 600;">Новини</h3>
+
+            {% if news_list %}
+                {% for item in news_list %}
+                <div class="news-card"
+                     onclick="toggleNews({{ item.id }})"
+                     style="
+                        display: flex;
+                        gap: 0;
+                        margin-bottom: 16px;
+                        border-radius: 16px;
+                        overflow: hidden;
+                        border: 1px solid #e5e7eb;
                         cursor: pointer;
+                        background: #ffffff;
+                     ">
+
+                    <!-- КАРТИНКА СЛІВА -->
+                    <div style="flex: 0 0 320px; max-width: 320px;">
+                        {% if item.image %}
+                            <img src="{{ item.image.url }}"
+                                 alt="{{ item.title }}"
+                                 style="
+                                    width: 100%;
+                                    height: 100%;
+                                    object-fit: cover;
+                                    display:block;
+                                    border-radius: 16px 0 0 16px;
+                                 ">
+                        {% else %}
+                            <div style="
+                                width: 100%;
+                                height: 100%;
+                                min-height: 180px;
+                                background: #e5e7eb;
+                                border-radius: 16px 0 0 16px;
+                            "></div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ТЕКСТ СПРАВА -->
+                    <div style="
+                        flex: 1 1 0;
+                        padding: 16px 20px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+                        border-radius: 0 16px 16px 0;
+                        background: #ffffff;
                     ">
-                Вийти
-            </button>
-        </form>
+                        <div>
+                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+                                • News
+                            </div>
+
+                            <h4 style="margin: 0 0 8px; font-size: 18px; font-weight: 600;">
+                                {{ item.title }}
+                            </h4>
+
+                            <div style="font-size: 13px; color: #9ca3af; margin-bottom: 4px;">
+                                {{ item.created_at|date:"d.m.Y H:i" }}
+                            </div>
+
+                            <!-- краткий текст в свернутом виде -->
+                            <div id="news-preview-{{ item.id }}"
+                                 style="font-size: 14px; color:#4b5563;">
+                                {{ item.body|truncatechars:120 }}
+                            </div>
+
+                            <!-- полный текст (изначально скрыт) -->
+                            <div id="news-body-{{ item.id }}"
+                                 class="news-body"
+                                 style="display:none; margin-top: 8px; font-size: 14px; line-height: 1.6; color:#374151;">
+                                {{ item.body|linebreaksbr }}
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="margin: 0; color: #6b7280;">Поки що новин немає.</p>
+            {% endif %}
+        </div>
+        <!-- КІНЕЦЬ БЛОКУ НОВИН -->
+
     {% else %}
         <p style="margin-bottom: 16px;">
             Ви не авторизовані.
@@ -59,4 +134,31 @@
             Увійти
         </a>
     {% endif %}
+
+    <script>
+        function toggleNews(id) {
+            const body = document.getElementById('news-body-' + id);
+            const preview = document.getElementById('news-preview-' + id);
+            if (!body || !preview) return;
+
+            const isHidden = (body.style.display === '' || body.style.display === 'none');
+
+            // сворачиваем все остальные новости
+            document.querySelectorAll('.news-body').forEach(function(el) {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('[id^="news-preview-"]').forEach(function(el) {
+                el.style.display = 'block';
+            });
+
+            // показываем/скрываем выбранную
+            if (isHidden) {
+                body.style.display = 'block';
+                preview.style.display = 'none';
+            } else {
+                body.style.display = 'none';
+                preview.style.display = 'block';
+            }
+        }
+    </script>
 {% endblock %}

@@ -4,7 +4,6 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from decimal import Decimal, ROUND_HALF_UP
 
-
 from io import BytesIO
 from docx import Document
 from django.utils import timezone
@@ -18,32 +17,73 @@ from django.core.files.base import ContentFile
 from .models import Client, ClientDocument
 from .forms import ClientForm
 import json
+from django.shortcuts import render
+from .models import News
+from core.models import News
 
+from .models import News
+
+
+
+@login_required
+def news_detail(request, pk):
+    news = get_object_or_404(News, pk=pk, is_published=True)
+    return render(request, "core/news_detail.html", {"news": news})
+
+
+
+@login_required
+def dashboard(request):
+    news_list = News.objects.filter(is_published=True)[:5]  # последние 5
+    context = {
+        "news_list": news_list,
+        # сюда же добавь остальные данные, которые уже были в этой вьюхе
+    }
+    return render(request, "core/dashboard.html", context)
 
 # ---------- helper для работы с DOCX ----------
 
 def fill_docx(template_path: str, context: dict) -> BytesIO:
     """
     Открывает docx, подставляет значения по меткам и возвращает файл в памяти.
+    Основной вариант – замена внутри runs (сохраняет форматирование).
+    Доп. вариант – если весь абзац = одному placeholder'у, меняем весь текст,
+    чтобы сработало даже если Word разорвал метку на несколько runs.
     """
+    from docx import Document
     doc = Document(template_path)
 
-    # абзацы
+    # --- Абзацы ---
     for p in doc.paragraphs:
+        original_text = p.text
+
         for key, value in context.items():
-            if key in p.text:
+            if key in original_text:
+                # 1) обычная замена по runs (как было)
                 for run in p.runs:
                     run.text = run.text.replace(key, value)
 
-    # таблицы
+                # 2) fallback: если placeholder всё ещё есть в абзаце
+                #    и абзац целиком состоит только из этого placeholder'а
+                if key in p.text and original_text.strip() == key:
+                    p.text = original_text.replace(key, value)
+
+    # --- Таблицы ---
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
+                    original_text = p.text
+
                     for key, value in context.items():
-                        if key in p.text:
+                        if key in original_text:
+                            # 1) обычная замена по runs
                             for run in p.runs:
                                 run.text = run.text.replace(key, value)
+
+                            # 2) fallback для целого абзаца = placeholder
+                            if key in p.text and original_text.strip() == key:
+                                p.text = original_text.replace(key, value)
 
     buf = BytesIO()
     doc.save(buf)
@@ -51,43 +91,45 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
     return buf
 
 
+
+
+
 # ---------- базовые вьюхи ----------
 @login_required(login_url='login')
-def home(request):
-    """
-    Головна сторінка AAP.
-    Доступна тільки авторизованим користувачам.
-    """
-    return render(request, "core/home.html")
-
-
-
-
 def login_view(request):
-    if request.user.is_authenticated:
-        # уже вошёл – сразу на главную
-        return redirect("home")
-
-    error = None
-
+    """
+    Простой логин через username/password.
+    """
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
 
         user = authenticate(request, username=username, password=password)
-
         if user is not None:
             login(request, user)
-
-            # если был параметр next – идём туда, иначе на home
-            next_url = request.GET.get("next")
-            if next_url:
-                return redirect(next_url)
-            return redirect("home")
+            return redirect("home")  # после логина идём на home
         else:
-            error = "Неверный логин или пароль"
+            error = "Невірний логін або пароль"
+    else:
+        error = None
 
     return render(request, "core/login.html", {"error": error})
+
+
+
+@login_required
+def home(request):
+    """
+    Главная страница AAP с новостями.
+    """
+    news_list = News.objects.filter(is_published=True).order_by("-created_at")[:5]
+
+    # Жёсткий debug в консоль, чтобы точно видеть, что вьюха вызывается
+    print("DEBUG home(): news_count =", news_list.count())
+
+    return render(request, "core/home.html", {
+        "news_list": news_list,
+    })
 
 
 @login_required
@@ -346,8 +388,8 @@ def client_delete(request, pk):
 def requests_view(request):
     """
     Сторінка «Запити» – формування Word-документів для обраного клієнта.
-    Одновременно сохраняем созданный документ в базу (ClientDocument),
-    чтобы он появился в «Базі документів».
+    Одночасно зберігаємо створений документ у базу (ClientDocument),
+    щоб він з'явився в «Базі документів».
     """
     # ті ж клієнти, що користувач бачить у dashboard
     if request.user.is_superuser:
@@ -369,7 +411,10 @@ def requests_view(request):
             .order_by("name")
         )
 
-    # данные для каскадных селектів (назва / період / договір / предмет)
+    # для зручності — памʼятаємо обраного клієнта (через GET)
+    selected_client_id = request.GET.get("client_id")
+
+    # дані для каскадних селектів (назва / період / договір / предмет)
     clients_for_js = list(
         clients.values(
             "id",
@@ -390,21 +435,20 @@ def requests_view(request):
 
         client = get_object_or_404(Client, pk=client_id)
 
-        # выбираем шаблон И ИМЯ ФАЙЛА
+        # выбор шаблона как было "до анкеты"
         if doc_type == "remembrance_team":
             template_name = "remembrance_team.docx"
             download_name = f"remembrance_team_{client.id}.docx"
-            doc_type_code = "request"   # або свій код
         elif doc_type == "team_independence":
             template_name = "team_independence.docx"
             download_name = f"team_independence_{client.id}.docx"
-            doc_type_code = "request"
         elif doc_type == "order":
             template_name = "order.docx"
             download_name = f"order_{client.id}.docx"
-            doc_type_code = "request"
         else:
             return redirect("requests")
+
+        doc_type_code = "request"
 
         template_path = os.path.join(
             settings.BASE_DIR,
@@ -431,21 +475,20 @@ def requests_view(request):
             "{{ CURRENT_USER }}": request.user.get_full_name() or request.user.username,
         }
 
-        # 1) генерируем DOCX в памяти
+        # генерируем DOCX
         file_obj = fill_docx(template_path, context_doc)
         file_bytes = file_obj.getvalue()
 
-        # 2) СОХРАНЯЕМ в ClientDocument (чтобы появился в «Базі документів»)
+        # сохраняем в ClientDocument
         doc_record = ClientDocument(
             client=client,
             uploaded_by=request.user,
             doc_type=doc_type_code,
             original_name=download_name,
         )
-        # сохраняем файл в FileField
         doc_record.file.save(download_name, ContentFile(file_bytes), save=True)
 
-        # 3) редиректим в «База документів» на этого клиента
+        # как и раньше — в "Базу документів" для этого клиента
         documents_url = reverse("documents")
         return redirect(f"{documents_url}?client_id={client.id}")
 
@@ -456,8 +499,11 @@ def requests_view(request):
         {
             "clients": clients,
             "clients_json": clients_json,
+            "selected_client_id": selected_client_id,
         },
     )
+
+
 
 
 @login_required

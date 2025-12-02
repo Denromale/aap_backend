@@ -1,0 +1,58 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ news.title }} – AAP{% endblock %}
+
+{% block page_title %}
+    <h1 class="topbar-title">Новина</h1>
+{% endblock %}
+
+{% block content %}
+<div style="
+    max-width: 1000px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+">
+    <a href="{% url 'home' %}" style="font-size: 14px; color:#2563eb; text-decoration:none;">
+        ← Повернутися на головну
+    </a>
+
+    <div style="display:flex; gap:24px; margin-top:16px; flex-wrap:wrap;">
+        {% if news.image %}
+            <div style="flex:0 0 320px; max-width:320px;">
+                <img src="{{ news.image.url }}"
+                     alt="{{ news.title }}"
+                     style="width:100%; border-radius:12px; object-fit:cover;">
+            </div>
+        {% endif %}
+
+        <div style="flex:1 1 0;">
+            <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">
+                • News
+            </div>
+            <h2 style="margin:0 0 8px; font-size:24px; font-weight:700;">
+                {{ news.title }}
+            </h2>
+
+            <div style="font-size:13px; color:#9ca3af; margin-bottom:16px;">
+                {{ news.created_at|date:"d.m.Y H:i" }}
+            </div>
+
+            <div style="font-size:15px; line-height:1.6; color:#374151;">
+                {{ news.body|linebreaksbr }}
+            </div>
+
+            {% if news.link %}
+                <div style="margin-top:16px;">
+                    <a href="{{ news.link }}" target="_blank"
+                       style="font-size:14px; color:#2563eb; text-decoration:none;">
+                        Перейти за посиланням →
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

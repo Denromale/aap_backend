@@ -1,6 +1,13 @@
 from django.contrib import admin
 from .models import Client
+from django.contrib import admin
+from .models import News  # плюс то, что уже импортируется
 
+@admin.register(News)
+class NewsAdmin(admin.ModelAdmin):
+    list_display = ("title", "created_at", "is_published")
+    list_filter = ("is_published", "created_at")
+    search_fields = ("title", "body")
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
