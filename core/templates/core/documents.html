@@ -5,66 +5,45 @@
 {% block content %}
 <h1>База документів</h1>
 
-{# === Фільтр клієнта (4 залежні списки) === #}
-<form method="get" id="client_filter_form" style="margin-bottom: 15px;">
-    <label for="client_name_select">
-        <strong>Клієнт / період / договір / предмет:</strong>
-    </label>
+{% if not selected_client %}
 
-    <div style="display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap;">
-        <select id="client_name_select"
-                class="form-control"
-                style="flex: 2 1 240px;"></select>
+    <p>
+        Спочатку оберіть проєкт на сторінці
+        <a href="{% url 'dashboard' %}">«Призначені проєкти»</a>.
+    </p>
 
-        <select id="client_period_select"
-                class="form-control"
-                style="flex: 1 1 140px;"
-                disabled></select>
+{% else %}
 
-        <select id="client_contract_select"
-                class="form-control"
-                style="flex: 1 1 160px;"
-                disabled></select>
+<div style="margin-bottom: 20px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+    <p style="margin: 0 0 4px 0;">
+        <strong>Клієнт:</strong> {{ selected_client.name }}
+    </p>
+    <p style="margin: 0 0 4px 0;">
+        <strong>Звітний період:</strong> {{ selected_client.reporting_period }}
+        &nbsp;&nbsp;
+        <strong>№ договору:</strong> {{ selected_client.requisites_number }}
+    </p>
+    <p style="margin: 0;">
+        <strong>Предмет завдання:</strong>
+        {{ selected_client.get_engagement_subject_display|default:selected_client.engagement_subject }}
+    </p>
+</div>
 
-        <select id="client_subject_select"
-                class="form-control"
-                style="flex: 2 1 240px;"
-                disabled></select>
-    </div>
-
-    <!-- сюда JS запишет id конкретного клієнта -->
-    <input type="hidden"
-           name="client_id"
-           id="client_id_hidden"
-           value="{{ selected_client.id|default:'' }}">
-
-    <button type="submit"
-            class="btn btn-primary"
-            style="margin-top: 10px;">
-        Показати документи
-    </button>
-</form>
-
-{% if selected_client %}
-
-    <h2>{{ selected_client.display_label }}</h2>
-
-    <!-- КНОПКА ПОКАЗАТЬ/СКРЫТЬ БЛОК ЗАВАНТАЖЕННЯ -->
+    <!-- КНОПКА ПОКАЗАТИ/ПРИХОВАТИ БЛОК ЗАВАНТАЖЕННЯ -->
     <button type="button"
             onclick="toggleUploadBlock()"
             style="margin: 15px 0; padding: 6px 12px; border-radius: 4px; border: none; background: #1e88e5; color: #fff; cursor: pointer;">
         Додати документ
     </button>
 
-    <!-- БЛОК ЗАВАНТАЖЕННЯ (ПО УМОЛЧАНИЮ СКРЫТИЙ) -->
+    <!-- БЛОК ЗАВАНТАЖЕННЯ (ПО УМОВЧАННЮ СХОВАНИЙ) -->
     <div id="upload-block"
          style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
 
         <h3>Завантажити новий документ</h3>
 
         <form method="post"
-              enctype="multipart/form-data"
-              action="?client_id={{ selected_client.id }}">
+              enctype="multipart/form-data">
             {% csrf_token %}
             <input type="hidden" name="action" value="upload">
 
@@ -116,14 +95,14 @@
             <tbody>
                 {% for doc in documents %}
                 <tr>
-                    <!-- 1. Название и ссылка на файл -->
+                    <!-- 1. Назва та посилання на файл -->
                     <td style="border: 1px solid #ddd; padding: 6px;">
                         <a href="{{ doc.file.url }}" target="_blank">
                             {{ doc.original_name }}
                         </a>
                     </td>
 
-                    <!-- 2. ОДНА форма на строку: обновление + удаление -->
+                    <!-- 2. Форма оновлення / видалення -->
                     <form method="post" action="{% url 'document_update_type' doc.id %}">
                         {% csrf_token %}
 
@@ -158,17 +137,14 @@
                             {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username|default:"" }}
                         </td>
 
-                        <!-- Дві кнопки в одному стовпчику -->
+                        <!-- Дві кнопки -->
                         <td style="border: 1px solid #ddd; padding: 6px;">
-
-                            <!-- Кнопка "Зберегти" (оновити тип / мітку) -->
                             <button type="submit"
                                     style="padding: 4px 8px; border-radius: 4px; border: none;
                                            background: #1e88e5; color: #fff; cursor: pointer; margin-right: 6px;">
                                 Зберегти
                             </button>
 
-                            <!-- Кнопка "Видалити" (та ж форма, але інший URL) -->
                             <button type="submit"
                                     formaction="{% url 'document_delete' doc.id %}"
                                     onclick="return confirm('Видалити документ?');"
@@ -176,7 +152,6 @@
                                            background: #e53935; color: #fff; cursor: pointer;">
                                 Видалити
                             </button>
-
                         </td>
                     </form>
                 </tr>
@@ -187,8 +162,6 @@
         <p>Документів для цього клієнта поки немає.</p>
     {% endif %}
 
-{% else %}
-    <p>Немає доступних клієнтів.</p>
 {% endif %}
 
 <script>
@@ -201,183 +174,5 @@
             block.style.display = 'none';
         }
     }
-
-    // ===== Залежні списки для вибору клієнта (як на сторінці "Запити") =====
-    // CLIENTS прилетів із views.py як JSON
-    const CLIENTS = {{ clients_json|safe }};
-
-    const nameSelect = document.getElementById("client_name_select");
-    const periodSelect = document.getElementById("client_period_select");
-    const contractSelect = document.getElementById("client_contract_select");
-    const subjectSelect = document.getElementById("client_subject_select");
-    const hiddenClientId = document.getElementById("client_id_hidden");
-
-    function resetSelect(selectEl, placeholderText) {
-        selectEl.innerHTML = "";
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = placeholderText;
-        selectEl.appendChild(opt);
-        selectEl.disabled = true;
-    }
-
-    // 1) заполняем первый селект (имена клиентов)
-    function initNameSelect() {
-        const names = Array.from(
-            new Set(
-                CLIENTS
-                    .map(c => c.name)
-                    .filter(Boolean)
-            )
-        ).sort();
-
-        resetSelect(nameSelect, "— виберіть клієнта —");
-        names.forEach(name => {
-            const opt = document.createElement("option");
-            opt.value = name;
-            opt.textContent = name;
-            nameSelect.appendChild(opt);
-        });
-        nameSelect.disabled = false;
-    }
-
-    // 2) при выборе имени – периоды
-    function onNameChange() {
-        const selectedName = nameSelect.value;
-
-        hiddenClientId.value = "";
-        resetSelect(periodSelect, "— період —");
-        resetSelect(contractSelect, "— договір —");
-        resetSelect(subjectSelect, "— предмет завдання —");
-
-        if (!selectedName) return;
-
-        const filtered = CLIENTS.filter(c => c.name === selectedName);
-        const periods = Array.from(
-            new Set(
-                filtered
-                    .map(c => c.reporting_period)
-                    .filter(Boolean)
-            )
-        ).sort();
-
-        if (!periods.length) return;
-
-        resetSelect(periodSelect, "— період —");
-        periods.forEach(p => {
-            const opt = document.createElement("option");
-            opt.value = p;
-            opt.textContent = p;
-            periodSelect.appendChild(opt);
-        });
-        periodSelect.disabled = false;
-    }
-
-    // 3) при выборе периода – договоры
-    function onPeriodChange() {
-        const selectedName = nameSelect.value;
-        const selectedPeriod = periodSelect.value;
-
-        hiddenClientId.value = "";
-        resetSelect(contractSelect, "— договір —");
-        resetSelect(subjectSelect, "— предмет завдання —");
-
-        if (!selectedName || !selectedPeriod) return;
-
-        const filtered = CLIENTS.filter(
-            c => c.name === selectedName && c.reporting_period === selectedPeriod
-        );
-
-        const contracts = Array.from(
-            new Set(
-                filtered
-                    .map(c => c.requisites_number)
-                    .filter(Boolean)
-            )
-        ).sort();
-
-        if (!contracts.length) return;
-
-        resetSelect(contractSelect, "— договір —");
-        contracts.forEach(num => {
-            const opt = document.createElement("option");
-            opt.value = num;
-            opt.textContent = num;
-            contractSelect.appendChild(opt);
-        });
-        contractSelect.disabled = false;
-    }
-
-    // 4) при выборе договора – предметы задания
-    function onContractChange() {
-        const selectedName = nameSelect.value;
-        const selectedPeriod = periodSelect.value;
-        const selectedContract = contractSelect.value;
-
-        hiddenClientId.value = "";
-        resetSelect(subjectSelect, "— предмет завдання —");
-
-        if (!selectedName || !selectedPeriod || !selectedContract) return;
-
-        const filtered = CLIENTS.filter(
-            c =>
-                c.name === selectedName &&
-                c.reporting_period === selectedPeriod &&
-                c.requisites_number === selectedContract
-        );
-
-        const subjects = Array.from(
-            new Set(
-                filtered
-                    .map(c => c.engagement_subject_display || c.engagement_subject)
-                    .filter(Boolean)
-            )
-        );
-
-        if (!subjects.length) return;
-
-        resetSelect(subjectSelect, "— предмет завдання —");
-        subjects.forEach(s => {
-            const opt = document.createElement("option");
-            opt.value = s;
-            opt.textContent = s;
-            subjectSelect.appendChild(opt);
-        });
-        subjectSelect.disabled = false;
-    }
-
-    // 5) при выборе предмета – записываем id клиента
-    function onSubjectChange() {
-        const selectedName = nameSelect.value;
-        const selectedPeriod = periodSelect.value;
-        const selectedContract = contractSelect.value;
-        const selectedSubjectText = subjectSelect.value;
-
-        if (!selectedName || !selectedPeriod || !selectedContract || !selectedSubjectText) {
-            hiddenClientId.value = "";
-            return;
-        }
-
-        const match = CLIENTS.find(
-            c =>
-                c.name === selectedName &&
-                c.reporting_period === selectedPeriod &&
-                c.requisites_number === selectedContract &&
-                (
-                    c.engagement_subject_display === selectedSubjectText ||
-                    c.engagement_subject === selectedSubjectText
-                )
-        );
-
-        hiddenClientId.value = match ? match.id : "";
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-        initNameSelect();
-        nameSelect.addEventListener("change", onNameChange);
-        periodSelect.addEventListener("change", onPeriodChange);
-        contractSelect.addEventListener("change", onContractChange);
-        subjectSelect.addEventListener("change", onSubjectChange);
-    });
 </script>
 {% endblock %}

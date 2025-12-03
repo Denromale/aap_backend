@@ -187,17 +187,18 @@ body.app-body {
 /* ===== КОНТЕНТ ===== */
 
 .main-content {
-    padding: 24px 32px 32px;
+    padding: 16px 16px 24px;
     box-sizing: border-box;
 }
 
 /* Карточка страницы */
 .page-card {
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;     /* убираем ограничение */
+    margin: 0;           /* без горизонтальных отступов */
     background: #ffffff;
-    border-radius: 12px;
-    padding: 24px 24px 28px;
+    border-radius: 16px;
+    padding: 16px 20px 20px;
     box-shadow:
         0 10px 15px -3px rgba(15, 23, 42, 0.08),
         0 4px 6px -4px rgba(15, 23, 42, 0.05);
@@ -361,10 +362,13 @@ input[type="submit"].btn-primary {
     margin-top: auto;      /* прижимает блок с "Вийти" к низу сайдбара */
 }
 
-/* правая часть смещается вправо на ширину сайдбара */
-.app-main {
-    margin-left: 240px;
+/* убираем центрирование карточки */
+.page-card {
+    margin: 24px 0 !important;
+    max-width: none !important;
+    width: 98% !important;
 }
+
 /* ===== Секции "Дані клієнта" (аккордеон) ===== */
 
 .client-sections {
@@ -434,4 +438,44 @@ input[type="submit"].btn-primary {
 .questionnaire-table thead {
     background: #f9fafb;
     font-weight: 600;
+}
+
+.client-radio {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.client-radio:checked {
+    accent-color: #22c55e; /* зелёная галочка */
+}
+
+.page-subtitle {
+    margin-top: -4px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #6b7280; /* светло-серый, как в topbar */
+}
+
+.table-filters {
+    margin-bottom: 12px;
+}
+
+.filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.filters-row input[type="text"],
+.filters-row select {
+    min-width: 160px;
+    max-width: 344px;
+}
+
+.filter-search {
+    min-width: 260px;   /* увеличиваем длину */
+    width: 320px;       /* фиксированная удобная ширина */
+    max-width: 420px;   /* если захочешь, можно больше */
 }

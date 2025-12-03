@@ -207,6 +207,21 @@ class Client(models.Model):
 
     def __str__(self):
         return self.display_label()
+    
+    task_subject = models.CharField(
+        "Предмет завдання",
+        max_length=255,
+        blank=True
+    )
+    
+    deadline = models.DateField(
+        "Кінцевий строк виконання договору",
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        return self.name
 
 
 # =================== МОДЕЛЬ ДОКУМЕНТОВ ===================

@@ -1,58 +1,153 @@
 {% extends "core/base.html" %}
 {% load i18n %}
 
-{% block title %}AAP – {% trans "Список клієнтів" %}{% endblock %}
+{% block title %}AAP – {% trans "Призначені проєкти" %}{% endblock %}
 
 {% block content %}
-<h2>{% trans "Список клієнтів" %}</h2>
 
-{% if user.is_superuser %}
-    <p>
-        <a class="btn btn-primary" href="{% url 'client_create' %}">
-            {% trans "Додати клієнта" %}
-        </a>
+<div class="aap-wide">
+
+    <h2>{% trans "Призначені проєкти" %}</h2>
+    <p class="page-subtitle">
+        Проєкти, у яких ви приймаєте участь як член команди
     </p>
-{% endif %}
 
-{% if clients %}
-<table>
-    <thead>
-    <tr>
-        <th>{% trans "Повна назва" %}</th>
-        <th>{% trans "ЄДРПОУ" %}</th>
-        <th>{% trans "№ договору" %}</th>
-        <th>{% trans "Звітний період" %}</th>
-        <th>{% trans "Статус" %}</th>
-        <th>{% trans "Створено" %}</th>
-        <th>{% trans "Дії" %}</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for client in clients %}
-        <tr>
-            <td>{{ client.name }}</td>
-            <td>{{ client.edrpou }}</td>
-            <td>{{ client.requisites_number }}</td>
-            <td>{{ client.reporting_period }}</td>
-            <td>{{ client.status }}</td>
-            <td>{{ client.created_at|date:"d.m.Y H:i" }}</td>
-            <td>
-                <a href="{% url 'client_detail' client.pk %}">{% trans "Дані" %}</a> |
-                <a href="{% url 'client_team' client.pk %}">{% trans "Команда" %}</a>
-                {% if user.is_superuser %}
-                    | <a href="{% url 'client_edit' client.pk %}">{% trans "Змінити" %}</a>
-                    | <a href="{% url 'client_delete' client.pk %}">{% trans "Видалити" %}</a>
-                {% endif %}
-            </td>
-        </tr>
-    {% empty %}
-        <tr>
-            <td colspan="7">{% trans "Клієнтів поки що немає." %}</td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% else %}
-    <p>{% trans "Клієнтів поки що немає." %}</p>
-{% endif %}
+    {% if user.is_superuser %}
+        <p>
+            <a class="btn btn-primary" href="{% url 'client_create' %}">
+                {% trans "Додати клієнта" %}
+            </a>
+        </p>
+    {% endif %}
+
+    {# ---------- ФИЛЬТРЫ ---------- #}
+    <form method="get" class="table-filters">
+        <div class="filters-row">
+
+            <!-- Поиск по названию -->
+            <input type="text"
+                   name="q"
+                   class="filter-search"
+                   value="{{ request.GET.q }}"
+                   placeholder="Пошук за назвою клієнта">
+
+            <!-- Звітний період -->
+            <select name="reporting_period">
+                <option value="">Усі періоди</option>
+                {% for p in reporting_period_choices %}
+                    <option value="{{ p }}"
+                            {% if request.GET.reporting_period == p|stringformat:"s" %}selected{% endif %}>
+                        {{ p }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <!-- Предмет завдання -->
+            <select name="subject">
+                <option value="">Усі предмети завдання</option>
+                {% for s in subject_choices %}
+                    <option value="{{ s.value }}"
+                            {% if request.GET.subject == s.value %}selected{% endif %}>
+                        {{ s.label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <!-- Статус -->
+            <select name="status">
+                <option value="">Усі статуси</option>
+                {% for st in status_choices %}
+                    <option value="{{ st }}"
+                            {% if request.GET.status == st %}selected{% endif %}>
+                        {{ st }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-primary">
+                Застосувати
+            </button>
+
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                Скинути
+            </a>
+        </div>
+    </form>
+
+    {# ---------- ТАБЛИЦА С РАДИО ВОКРУГ ФОРМЫ ---------- #}
+    {% if clients %}
+    <form method="post"
+          action="{% url 'set_active_client' %}"
+          id="active-client-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+        <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>{% trans "Повна назва" %}</th>
+                        <th>{% trans "Звітний період" %}</th>
+                        <th>{% trans "№ договору" %}</th>
+                        <th>{% trans "Предмет завдання" %}</th>
+                        <th>{% trans "Статус" %}</th>
+                        <th>{% trans "Кінцевий строк виконання договору" %}</th>
+                        <th>{% trans "Дії" %}</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for client in clients %}
+                        <tr>
+                            <!-- Радиокнопка выбора -->
+                            <td>
+                                <input type="radio"
+                                       name="selected_client"
+                                       value="{{ client.pk }}"
+                                       class="client-radio"
+                                       {% if active_client_id == client.pk|stringformat:"s" %}checked{% endif %}>
+                            </td>
+
+                            <td>{{ client.name }}</td>
+                            <td>{{ client.reporting_period }}</td>
+                            <td>{{ client.requisites_number }}</td>
+                            <td>{{ client.get_engagement_subject_display }}</td>
+                            <td>{{ client.status }}</td>
+                            <td>{{ client.contract_deadline|date:"d.m.Y" }}</td>
+
+                            <td>
+                                <a href="{% url 'client_detail' client.pk %}">{% trans "Дані" %}</a> |
+                                <a href="{% url 'client_team' client.pk %}">{% trans "Команда" %}</a>
+                                {% if user.is_superuser %}
+                                    | <a href="{% url 'client_edit' client.pk %}">{% trans "Змінити" %}</a>
+                                    | <a href="{% url 'client_delete' client.pk %}">{% trans "Видалити" %}</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </form>
+
+    {% else %}
+        <p>Немає проєктів за обраними фільтрами.</p>
+    {% endif %}
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("active-client-form");
+    if (!form) return;
+
+    const radios = form.querySelectorAll(".client-radio");
+
+    radios.forEach(r => {
+        r.addEventListener("change", () => {
+            form.submit();
+        });
+    });
+});
+</script>
+
 {% endblock %}

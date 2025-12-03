@@ -19,7 +19,7 @@ urlpatterns = [
     path('documents/', views.documents_view, name='documents'),
     path('documents/<int:doc_id>/update/', views.document_update_type, name='document_update_type'),
     path('documents/<int:pk>/delete/', views.document_delete, name='document_delete'),
-
+    path("set-active-client/", views.set_active_client, name="set_active_client"),
 
     path('logout/', views.logout_view, name='logout'),
 ]

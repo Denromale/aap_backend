@@ -174,11 +174,16 @@
 
 </div>
 
+
+{% with request.GET.urlencode as query %}
 <p style="margin-top: 16px;">
-    <a class="btn btn-secondary" href="{% url 'dashboard' %}">
+    <a class="btn btn-secondary"
+       href="{% url 'dashboard' %}{% if query %}?{{ query }}{% endif %}">
         {% trans "Назад до списку" %}
     </a>
 </p>
+{% endwith %}
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

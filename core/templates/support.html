@@ -1,0 +1,38 @@
+{% extends "core/base.html" %}
+
+{% block title %}AAP – Підтримка{% endblock %}
+
+{% block page_title %}
+    <h1 class="topbar-title">Підтримка</h1>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 480px; margin: 0 auto;">
+    <h2>Напишіть нам</h2>
+    <p>Заповніть форму, і ми відповімо на ваші запитання.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-row" style="flex-direction: column; gap: 12px;">
+            {{ form.non_field_errors }}
+
+            <div>
+                {{ form.name.errors }}
+                {{ form.name }}
+            </div>
+            <div>
+                {{ form.email.errors }}
+                {{ form.email }}
+            </div>
+            <div>
+                {{ form.message.errors }}
+                {{ form.message }}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Send
+        </button>
+    </form>
+</div>
+{% endblock %}

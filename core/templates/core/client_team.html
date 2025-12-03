@@ -71,7 +71,11 @@
     </tbody>
 </table>
 
+{% with request.GET.urlencode as query %}
 <p style="margin-top: 20px;">
-    <a href="{% url 'dashboard' %}" class="btn btn-secondary">{% trans "Назад" %}</a>
+    <a href="{% url 'dashboard' %}{% if query %}?{{ query }}{% endif %}" class="btn btn-secondary">
+        {% trans "Назад" %}
+    </a>
 </p>
+{% endwith %}
 {% endblock %}

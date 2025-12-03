@@ -9,6 +9,9 @@
 
     <!-- наш общий стиль -->
     <link rel="stylesheet" href="{% static 'core/app.css' %}">
+
+    <!-- favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'core/favicon.ico' %}">
 </head>
 <body class="app-body">
 
@@ -28,7 +31,7 @@
                 </a>
                 <a href="{% url 'dashboard' %}"
                    class="sidebar-link{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}">
-                    Список клієнтів
+                   Призначені проєкти
                 </a>
                 <a href="{% url 'requests' %}"
                    class="sidebar-link{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
@@ -55,7 +58,6 @@
 
     <!-- ПРАВА ЧАСТИНА -->
     <div class="app-main">
-        <!-- верхняя полоска -->
         <header class="topbar">
             <div class="topbar-left">
                 {% block page_title %}
@@ -81,7 +83,6 @@
             </div>
         </header>
 
-        <!-- сам контент -->
         <main class="main-content">
             <div class="page-card">
                 {% block content %}{% endblock %}

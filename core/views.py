@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from decimal import Decimal, ROUND_HALF_UP
 
+
 from io import BytesIO
 from docx import Document
 from django.utils import timezone
@@ -22,6 +23,7 @@ from .models import News
 from core.models import News
 
 from .models import News
+from django.views.decorators.http import require_POST
 
 
 
@@ -34,14 +36,99 @@ def news_detail(request, pk):
 
 @login_required
 def dashboard(request):
-    news_list = News.objects.filter(is_published=True)[:5]  # последние 5
+    """
+    Призначені проєкти:
+    - Адмін бачить усіх клієнтів
+    - Звичайний користувач – тільки там, де він у ролі
+    + Фільтри по назві, періоду, предмету завдання та статусу
+    """
+    # базовый queryset с учётом прав доступу
+    if request.user.is_superuser:
+        base_qs = Client.objects.all()
+    else:
+        base_qs = (
+            Client.objects.filter(
+                Q(manager=request.user)
+                | Q(auditor=request.user)
+                | Q(auditor2=request.user)
+                | Q(auditor3=request.user)
+                | Q(assistant=request.user)
+                | Q(assistant2=request.user)
+                | Q(assistant3=request.user)
+                | Q(assistant4=request.user)
+                | Q(qa_manager=request.user)
+            )
+            .distinct()
+        )
+
+    # ---------- фильтры из GET ----------
+    q = (request.GET.get("q") or "").strip()
+    reporting_period = (request.GET.get("reporting_period") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    subject = (request.GET.get("subject") or "").strip()
+
+    clients = base_qs
+
+    if q:
+        clients = clients.filter(name__icontains=q)
+
+    if reporting_period:
+        clients = clients.filter(reporting_period=reporting_period)
+
+    if status:
+        clients = clients.filter(status=status)
+
+    if subject:
+        clients = clients.filter(engagement_subject=subject)
+
+    clients = clients.order_by("-created_at")
+
+    # ---------- значения для селектов ----------
+    reporting_period_choices = (
+        base_qs.values_list("reporting_period", flat=True)
+        .distinct()
+        .order_by("reporting_period")
+    )
+
+    status_choices = (
+        base_qs.values_list("status", flat=True)
+        .exclude(status__isnull=True)
+        .exclude(status__exact="")
+        .distinct()
+        .order_by("status")
+    )
+
+    subject_codes = (
+        base_qs.values_list("engagement_subject", flat=True)
+        .exclude(engagement_subject__isnull=True)
+        .exclude(engagement_subject__exact(""))
+        .distinct()
+        .order_by("engagement_subject")
+    )
+
+    subject_choices = [
+        {
+            "value": code,
+            "label": Client(engagement_subject=code).get_engagement_subject_display(),
+        }
+        for code in subject_codes
+    ]
+
+    # ---------- активный проект из сессии ----------
+    active_client_id = request.session.get("active_client_id")
+    # приводим к строке, чтобы сравнивать с value радио (тоже строка)
+    active_client_id_str = str(active_client_id) if active_client_id is not None else ""
+
     context = {
-        "news_list": news_list,
-        # сюда же добавь остальные данные, которые уже были в этой вьюхе
+        "clients": clients,
+        "reporting_period_choices": reporting_period_choices,
+        "status_choices": status_choices,
+        "subject_choices": subject_choices,
+        "active_client_id": active_client_id_str,
     }
+
     return render(request, "core/dashboard.html", context)
 
-# ---------- helper для работы с DOCX ----------
 
 def fill_docx(template_path: str, context: dict) -> BytesIO:
     """
@@ -92,10 +179,34 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
 
 
 
+@login_required
+@require_POST
+def set_active_client(request):
+    """
+    Сохраняет выбранный проект в сессии из формы на dashboard.
+    """
+    client_id = request.POST.get("selected_client")  # имя radio в шаблоне
+    next_url = request.POST.get("next") or reverse("dashboard")
+
+    if client_id:
+        try:
+            client = Client.objects.get(pk=client_id)
+        except Client.DoesNotExist:
+            # если передали мусор — очищаем выбор
+            request.session.pop("active_client_id", None)
+        else:
+            # ВАЖНО: пишем именно active_client_id
+            request.session["active_client_id"] = client.id
+    else:
+        # если пришёл пустой value — тоже убираем
+        request.session.pop("active_client_id", None)
+
+    return redirect(next_url)
+
 
 
 # ---------- базовые вьюхи ----------
-@login_required(login_url='login')
+# @login_required(login_url='login')
 def login_view(request):
     """
     Простой логин через username/password.
@@ -135,13 +246,16 @@ def home(request):
 @login_required
 def dashboard(request):
     """
-    Админ видит всех клиентов.
-    Обычный пользователь – только клиентов, где он есть в какой-то роли.
+    Призначені проєкти:
+    - Адмін бачить усіх клієнтів
+    - Звичайний користувач – тільки там, де він у ролі
+    + Фільтри по назві, періоду, предмету завдання та статусу
     """
+    # базовый queryset с учётом прав доступа
     if request.user.is_superuser:
-        clients = Client.objects.all().order_by("-created_at")
+        base_qs = Client.objects.all()
     else:
-        clients = (
+        base_qs = (
             Client.objects.filter(
                 Q(manager=request.user)
                 | Q(auditor=request.user)
@@ -154,10 +268,80 @@ def dashboard(request):
                 | Q(qa_manager=request.user)
             )
             .distinct()
-            .order_by("-created_at")
         )
 
-    return render(request, "core/dashboard.html", {"clients": clients})
+    # ---------- читаем фильтры из GET ----------
+    q = (request.GET.get("q") or "").strip()
+    reporting_period = (request.GET.get("reporting_period") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    subject = (request.GET.get("subject") or "").strip()
+
+    clients = base_qs
+
+    if q:
+        clients = clients.filter(name__icontains=q)
+
+    if reporting_period:
+        clients = clients.filter(reporting_period=reporting_period)
+
+    if status:
+        clients = clients.filter(status=status)
+
+    if subject:
+        clients = clients.filter(engagement_subject=subject)
+
+    clients = clients.order_by("-created_at")
+
+    # ---------- значения для выпадающих фильтров ----------
+    reporting_period_choices = (
+        base_qs.values_list("reporting_period", flat=True)
+        .distinct()
+        .order_by("reporting_period")
+    )
+
+    status_choices = (
+        base_qs.values_list("status", flat=True)
+        .exclude(status__isnull=True)
+        .exclude(status__exact="")
+        .distinct()
+        .order_by("status")
+    )
+
+    subject_codes = (
+        base_qs.values_list("engagement_subject", flat=True)
+        .exclude(engagement_subject__isnull=True)
+        .exclude(engagement_subject__exact="")
+        .distinct()
+        .order_by("engagement_subject")
+    )
+
+    subject_choices = [
+        {
+            "value": code,
+            "label": Client(engagement_subject=code).get_engagement_subject_display(),
+        }
+        for code in subject_codes
+    ]
+
+    # ---------- активный клиент из сессии ----------
+    active_client_id = request.session.get("active_client_id")
+    # приводим к строке, чтобы удобно сравнивать в шаблоне с value инпута
+    active_client_id_str = str(active_client_id) if active_client_id is not None else ""
+
+    context = {
+        "clients": clients,
+        "reporting_period_choices": reporting_period_choices,
+        "status_choices": status_choices,
+        "subject_choices": subject_choices,
+        "active_client_id": active_client_id_str,
+    }
+
+    return render(request, "core/dashboard.html", context)
+
+
+
+
+
 
 
 # ---------- Команда клиента (часы/бюджет) ----------
@@ -387,15 +571,18 @@ def client_delete(request, pk):
 @login_required
 def requests_view(request):
     """
-    Сторінка «Запити» – формування Word-документів для обраного клієнта.
-    Одночасно зберігаємо створений документ у базу (ClientDocument),
-    щоб він з'явився в «Базі документів».
+    Страница «Запити».
+
+    Клиент берётся из active_client_id в сессии (ставится галочкой на dashboard).
+    Никаких выпадающих списков, только 3 кнопки генерации документов
+    для уже выбранного проекта.
     """
-    # ті ж клієнти, що користувач бачить у dashboard
+
+    # те же клиенты, что пользователь видит на dashboard
     if request.user.is_superuser:
-        clients = Client.objects.all().order_by("name")
+        clients_qs = Client.objects.all()
     else:
-        clients = (
+        clients_qs = (
             Client.objects.filter(
                 Q(manager=request.user)
                 | Q(auditor=request.user)
@@ -408,100 +595,93 @@ def requests_view(request):
                 | Q(qa_manager=request.user)
             )
             .distinct()
-            .order_by("name")
         )
 
-    # для зручності — памʼятаємо обраного клієнта (через GET)
-    selected_client_id = request.GET.get("client_id")
-
-    # дані для каскадних селектів (назва / період / договір / предмет)
-    clients_for_js = list(
-        clients.values(
-            "id",
-            "name",
-            "reporting_period",
-            "requisites_number",
-            "engagement_subject",
-        )
+    # активный клиент из сессии
+    active_client_id = request.session.get("active_client_id")
+    selected_client = (
+        clients_qs.filter(id=active_client_id).first() if active_client_id else None
     )
-    clients_json = json.dumps(clients_for_js, ensure_ascii=False)
 
-    if request.method == "POST":
-        client_id = request.POST.get("client_id")
-        doc_type = request.POST.get("doc_type")
-
-        if not client_id or not doc_type:
-            return redirect("requests")
-
-        client = get_object_or_404(Client, pk=client_id)
-
-        # выбор шаблона как было "до анкеты"
-        if doc_type == "remembrance_team":
-            template_name = "remembrance_team.docx"
-            download_name = f"remembrance_team_{client.id}.docx"
-        elif doc_type == "team_independence":
-            template_name = "team_independence.docx"
-            download_name = f"team_independence_{client.id}.docx"
-        elif doc_type == "order":
-            template_name = "order.docx"
-            download_name = f"order_{client.id}.docx"
-        else:
-            return redirect("requests")
-
-        doc_type_code = "request"
-
-        template_path = os.path.join(
-            settings.BASE_DIR,
-            "core",
-            "docs",
-            template_name,
+    # если ничего не выбрано – просто показываем шаблон с сообщением
+    if request.method == "GET":
+        return render(
+            request,
+            "core/requests.html",
+            {
+                "selected_client": selected_client,
+            },
         )
 
-        today_str = timezone.now().strftime("%d.%m.%Y")
+    # ------- POST: сформировать документ для выбранного клиента -------
 
-        context_doc = {
-            "{{ CLIENT_NAME }}": client.name or "",
-            "{{ REPORTING_PERIOD }}": client.reporting_period or "",
-            "{{ MANAGER }}": client.manager.get_full_name() if client.manager else "",
-            "{{ AUDITOR_1 }}": client.auditor.get_full_name() if client.auditor else "",
-            "{{ AUDITOR_2 }}": client.auditor2.get_full_name() if client.auditor2 else "",
-            "{{ AUDITOR_3 }}": client.auditor3.get_full_name() if client.auditor3 else "",
-            "{{ ASSISTANT_1 }}": client.assistant.get_full_name() if client.assistant else "",
-            "{{ ASSISTANT_2 }}": client.assistant2.get_full_name() if client.assistant2 else "",
-            "{{ ASSISTANT_3 }}": client.assistant3.get_full_name() if client.assistant3 else "",
-            "{{ ASSISTANT_4 }}": client.assistant4.get_full_name() if client.assistant4 else "",
-            "{{ QA_MANAGER }}": client.qa_manager.get_full_name() if client.qa_manager else "",
-            "{{ TODAY_DATE }}": today_str,
-            "{{ CURRENT_USER }}": request.user.get_full_name() or request.user.username,
-        }
+    if not selected_client:
+        # на всякий случай: запрос пришёл без выбранного проекта
+        return redirect("requests")
 
-        # генерируем DOCX
-        file_obj = fill_docx(template_path, context_doc)
-        file_bytes = file_obj.getvalue()
+    doc_type = request.POST.get("doc_type")  # remembrance_team / team_independence / order
+    if doc_type not in {"remembrance_team", "team_independence", "order"}:
+        return redirect("requests")
 
-        # сохраняем в ClientDocument
-        doc_record = ClientDocument(
-            client=client,
-            uploaded_by=request.user,
-            doc_type=doc_type_code,
-            original_name=download_name,
-        )
-        doc_record.file.save(download_name, ContentFile(file_bytes), save=True)
+    client = selected_client
 
-        # как и раньше — в "Базу документів" для этого клиента
-        documents_url = reverse("documents")
-        return redirect(f"{documents_url}?client_id={client.id}")
+    # выбор шаблона
+    if doc_type == "remembrance_team":
+        template_name = "remembrance_team.docx"
+        download_name = f"remembrance_team_{client.id}.docx"
+    elif doc_type == "team_independence":
+        template_name = "team_independence.docx"
+        download_name = f"team_independence_{client.id}.docx"
+    else:  # "order"
+        template_name = "order.docx"
+        download_name = f"order_{client.id}.docx"
 
-    # GET-запрос – просто показываем страницу
-    return render(
-        request,
-        "core/requests.html",
-        {
-            "clients": clients,
-            "clients_json": clients_json,
-            "selected_client_id": selected_client_id,
-        },
+    doc_type_code = "request"
+
+    template_path = os.path.join(
+        settings.BASE_DIR,
+        "core",
+        "docs",
+        template_name,
     )
+
+    today_str = timezone.now().strftime("%d.%m.%Y")
+
+    context_doc = {
+        "{{ CLIENT_NAME }}": client.name or "",
+        "{{ REPORTING_PERIOD }}": client.reporting_period or "",
+        "{{ MANAGER }}": client.manager.get_full_name() if client.manager else "",
+        "{{ AUDITOR_1 }}": client.auditor.get_full_name() if client.auditor else "",
+        "{{ AUDITOR_2 }}": client.auditor2.get_full_name() if client.auditor2 else "",
+        "{{ AUDITOR_3 }}": client.auditor3.get_full_name() if client.auditor3 else "",
+        "{{ ASSISTANT_1 }}": client.assistant.get_full_name() if client.assistant else "",
+        "{{ ASSISTANT_2 }}": client.assistant2.get_full_name() if client.assistant2 else "",
+        "{{ ASSISTANT_3 }}": client.assistant3.get_full_name() if client.assistant3 else "",
+        "{{ ASSISTANT_4 }}": client.assistant4.get_full_name() if client.assistant4 else "",
+        "{{ QA_MANAGER }}": client.qa_manager.get_full_name() if client.qa_manager else "",
+        "{{ TODAY_DATE }}": today_str,
+        "{{ CURRENT_USER }}": request.user.get_full_name() or request.user.username,
+    }
+
+    # генерируем DOCX
+    file_obj = fill_docx(template_path, context_doc)
+    file_bytes = file_obj.getvalue()
+
+    # сохраняем в ClientDocument
+    doc_record = ClientDocument(
+        client=client,
+        uploaded_by=request.user,
+        doc_type=doc_type_code,
+        original_name=download_name,
+    )
+    doc_record.file.save(download_name, ContentFile(file_bytes), save=True)
+
+    # и сразу переходим в Базу документів этого клиента
+    documents_url = reverse("documents")
+    return redirect(f"{documents_url}?client_id={client.id}")
+
+
+
 
 
 
@@ -542,7 +722,7 @@ def documents_view(request):
             },
         )
 
-    # ---------- данные для JS (зависимые списки) ----------
+    # ---------- данные для JS (если ещё используешь) ----------
     clients_list = []
     for c in clients:
         clients_list.append(
@@ -560,15 +740,21 @@ def documents_view(request):
     clients_json = json.dumps(clients_list, ensure_ascii=False)
 
     # ---------- определяем выбранного клиента ----------
+
+    # 1) пробуем взять из GET (если вдруг ?client_id=... всё ещё используется)
     client_id = request.GET.get("client_id")
+
+    # 2) если нет — берём активного з dashboard
+    if not client_id:
+        client_id = request.session.get("active_client_id")
+
     selected_client = None
     if client_id:
         selected_client = clients.filter(id=client_id).first()
 
     # ---------- загрузка файла (POST) ----------
     if request.method == "POST" and request.POST.get("action") == "upload":
-        # сюда придём только когда уже выбран клиент,
-        # форма отправляется с ?client_id=...
+        # сюда придём только когда уже выбран клиент
         if selected_client:
             file = request.FILES.get("file")
             if file:
@@ -607,6 +793,8 @@ def documents_view(request):
             "clients_json": clients_json,
         },
     )
+
+
 
 
 

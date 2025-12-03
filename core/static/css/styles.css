@@ -144,3 +144,17 @@ body {
     font-size: 14px;
     opacity: 0.9;
 }
+
+/* Расширяет поле контента для таблиц */
+.aap-wide {
+    max-width: 1700px;      /* регулируй — 1400–1700px тоже подходят */
+    width: 100%;
+    margin: 0 auto;
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+/* Чтобы таблица растягивалась */
+.aap-wide table {
+    width: 100%;
+}

@@ -129,6 +129,9 @@ class ClientForm(forms.ModelForm):
             "assistant3",
             "assistant4",
             "qa_manager",
+
+            "task_subject",          # ← НОВОЕ
+            "deadline", 
         ]
 
         widgets = {
