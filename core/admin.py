@@ -1,21 +1,38 @@
 from django.contrib import admin
-from .models import Client
-from django.contrib import admin
-from .models import News  # плюс то, что уже импортируется
+from .models import Organization, Client, ClientDocument, News
 
-@admin.register(News)
-class NewsAdmin(admin.ModelAdmin):
-    list_display = ("title", "created_at", "is_published")
-    list_filter = ("is_published", "created_at")
-    search_fields = ("title", "body")
 
+# ---------- ORGANIZATION ----------
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ("id", "name")
+    search_fields = ("name",)
+
+
+# ---------- CLIENT ----------
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ("name", "edrpou", "reporting_period", "status", "created_at")
+    list_display = (
+        "name",
+        "organization",      # ← показываем организацию в списке
+        "edrpou",
+        "reporting_period",
+        "status",
+        "created_at",
+    )
     search_fields = ("name", "edrpou", "kved", "requisites_number")
-    list_filter = ("status", "poi", "mandatory_audit", "cw_controls_done")
+    list_filter = (
+        "organization",      # ← фильтр по организации
+        "status",
+        "poi",
+        "mandatory_audit",
+        "cw_controls_done",
+    )
 
     fieldsets = (
+        ("Організація", {
+            "fields": ("organization",),   # ← организация теперь явно в форме
+        }),
         ("Основные данные", {
             "fields": ("name", "edrpou", "kved", "poi"),
         }),
@@ -35,7 +52,7 @@ class ClientAdmin(admin.ModelAdmin):
                 "requisites_date",
                 "requisites_amount",
                 "requisites_vat",
-                "planned_hours", 
+                "planned_hours",
             ),
         }),
         ("Надзор, ОПФ, обязательный аудит", {
@@ -45,7 +62,7 @@ class ClientAdmin(admin.ModelAdmin):
             "fields": ("reporting_period", "contract_deadline"),
         }),
         ("Предмет задания", {
-            "fields": ("engagement_subject",),
+            "fields": ("engagement_subject", "task_subject", "deadline"),
         }),
         ("Уполномоченное лицо клиента", {
             "fields": ("authorized_person_name", "authorized_person_email"),
@@ -61,12 +78,28 @@ class ClientAdmin(admin.ModelAdmin):
             ),
         }),
         ("Статус и команда", {
-    "fields": (
-        "status",
-        "manager",
-        "auditor", "auditor2", "auditor3",
-        "assistant", "assistant2", "assistant3", "assistant4",
-        "qa_manager",
-    ),
-}),
+            "fields": (
+                "status",
+                "manager",
+                "auditor", "auditor2", "auditor3",
+                "assistant", "assistant2", "assistant3", "assistant4",
+                "qa_manager",
+            ),
+        }),
     )
+
+
+# ---------- DOCUMENTS ----------
+@admin.register(ClientDocument)
+class ClientDocumentAdmin(admin.ModelAdmin):
+    list_display = ("id", "original_name", "client", "organization", "doc_type", "created_at")
+    search_fields = ("original_name",)
+    list_filter = ("organization", "doc_type")
+
+
+# ---------- NEWS ----------
+@admin.register(News)
+class NewsAdmin(admin.ModelAdmin):
+    list_display = ("title", "created_at", "is_published")
+    list_filter = ("is_published", "created_at")
+    search_fields = ("title", "body")

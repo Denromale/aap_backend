@@ -28,35 +28,35 @@
 
             <form method="post" class="login-form">
                 {% csrf_token %}
-
+            
                 <div class="input-group">
                     <span class="input-icon"></span>
                     <input type="text" name="username"
                            placeholder="{% trans 'Логін' %}" required>
                 </div>
-
+            
                 <div class="input-group">
                     <span class="input-icon"></span>
                     <input type="password" name="password"
                            placeholder="{% trans 'Пароль' %}" required>
                 </div>
-
+            
                 <div class="extra-row">
                     <label class="remember-box">
-                        <input type="checkbox" name="remember">
+                        <input type="checkbox" name="remember_me" id="id_remember_me">
                         <span>{% trans "Запам’ятати мене" %}</span>
                     </label>
-
-                    <a class="forgot-link" href="#">
-                        {% trans "Забули пароль?" %}
-                    </a>
+            
+                    <p style="margin-top: 8px;">
+                        <a href="{% url 'password_reset' %}">Забули пароль?</a>
+                    </p>
                 </div>
-
+            
                 <button type="submit" class="login-btn">
                     {% trans "Увійти" %}
                 </button>
             </form>
-
+            
         </section>
 
         <!-- правая синяя панель -->
@@ -66,3 +66,5 @@
                 <p></p>
             </div>
         </se
+        
+       

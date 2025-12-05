@@ -1,31 +1,25 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from decimal import Decimal, ROUND_HALF_UP
+from io import BytesIO
+import json
+import os
+
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-from decimal import Decimal, ROUND_HALF_UP
-
-
-from io import BytesIO
-from docx import Document
-from django.utils import timezone
-from django.http import HttpResponse
-import os
-from django.conf import settings
-
-from django.urls import reverse
 from django.core.files.base import ContentFile
-
-from .models import Client, ClientDocument
-from .forms import ClientForm
-import json
-from django.shortcuts import render
-from .models import News
-from core.models import News
-
-from .models import News
+from django.db.models import Q
+from django.http import HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
+from docx import Document
+
+from .forms import ClientForm
+from .models import Client, ClientDocument, News
 
 
+# ---------- NEWS ----------
 
 @login_required
 def news_detail(request, pk):
@@ -33,18 +27,20 @@ def news_detail(request, pk):
     return render(request, "core/news_detail.html", {"news": news})
 
 
+# ---------- DASHBOARD ----------
 
 @login_required
 def dashboard(request):
     """
     Призначені проєкти:
-    - Адмін бачить усіх клієнтів
+    - Адмін бачить усіх клієнтів своєї організації
     - Звичайний користувач – тільки там, де він у ролі
     + Фільтри по назві, періоду, предмету завдання та статусу
     """
-    # базовый queryset с учётом прав доступу
+
+    # базовый queryset с учётом прав доступу и organization
     if request.user.is_superuser:
-        base_qs = Client.objects.all()
+        base_qs = Client.objects.filter(organization=request.organization)
     else:
         base_qs = (
             Client.objects.filter(
@@ -56,7 +52,8 @@ def dashboard(request):
                 | Q(assistant2=request.user)
                 | Q(assistant3=request.user)
                 | Q(assistant4=request.user)
-                | Q(qa_manager=request.user)
+                | Q(qa_manager=request.user),
+                organization=request.organization,
             )
             .distinct()
         )
@@ -101,7 +98,7 @@ def dashboard(request):
     subject_codes = (
         base_qs.values_list("engagement_subject", flat=True)
         .exclude(engagement_subject__isnull=True)
-        .exclude(engagement_subject__exact(""))
+        .exclude(engagement_subject__exact="")
         .distinct()
         .order_by("engagement_subject")
     )
@@ -116,7 +113,6 @@ def dashboard(request):
 
     # ---------- активный проект из сессии ----------
     active_client_id = request.session.get("active_client_id")
-    # приводим к строке, чтобы сравнивать с value радио (тоже строка)
     active_client_id_str = str(active_client_id) if active_client_id is not None else ""
 
     context = {
@@ -130,28 +126,21 @@ def dashboard(request):
     return render(request, "core/dashboard.html", context)
 
 
+# ---------- DOCX УТИЛИТА ----------
+
 def fill_docx(template_path: str, context: dict) -> BytesIO:
     """
     Открывает docx, подставляет значения по меткам и возвращает файл в памяти.
-    Основной вариант – замена внутри runs (сохраняет форматирование).
-    Доп. вариант – если весь абзац = одному placeholder'у, меняем весь текст,
-    чтобы сработало даже если Word разорвал метку на несколько runs.
     """
-    from docx import Document
     doc = Document(template_path)
 
     # --- Абзацы ---
     for p in doc.paragraphs:
         original_text = p.text
-
         for key, value in context.items():
             if key in original_text:
-                # 1) обычная замена по runs (как было)
                 for run in p.runs:
                     run.text = run.text.replace(key, value)
-
-                # 2) fallback: если placeholder всё ещё есть в абзаце
-                #    и абзац целиком состоит только из этого placeholder'а
                 if key in p.text and original_text.strip() == key:
                     p.text = original_text.replace(key, value)
 
@@ -161,14 +150,10 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     original_text = p.text
-
                     for key, value in context.items():
                         if key in original_text:
-                            # 1) обычная замена по runs
                             for run in p.runs:
                                 run.text = run.text.replace(key, value)
-
-                            # 2) fallback для целого абзаца = placeholder
                             if key in p.text and original_text.strip() == key:
                                 p.text = original_text.replace(key, value)
 
@@ -178,6 +163,7 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
     return buf
 
 
+# ---------- ACTIVE CLIENT В СЕССИИ ----------
 
 @login_required
 @require_POST
@@ -185,172 +171,84 @@ def set_active_client(request):
     """
     Сохраняет выбранный проект в сессии из формы на dashboard.
     """
-    client_id = request.POST.get("selected_client")  # имя radio в шаблоне
+    client_id = request.POST.get("selected_client")
     next_url = request.POST.get("next") or reverse("dashboard")
 
     if client_id:
         try:
-            client = Client.objects.get(pk=client_id)
+            client = Client.objects.get(
+                pk=client_id,
+                organization=request.organization,
+            )
         except Client.DoesNotExist:
-            # если передали мусор — очищаем выбор
             request.session.pop("active_client_id", None)
         else:
-            # ВАЖНО: пишем именно active_client_id
             request.session["active_client_id"] = client.id
     else:
-        # если пришёл пустой value — тоже убираем
         request.session.pop("active_client_id", None)
 
     return redirect(next_url)
 
 
+# ---------- AUTH ----------
 
-# ---------- базовые вьюхи ----------
-# @login_required(login_url='login')
 def login_view(request):
     """
-    Простой логин через username/password.
+    Простой логин через username/password + галочка 'Запомнить'.
+    Если галочка НЕ отмечена — сессия живёт до закрытия браузера.
+    Если отмечена — используется стандартный срок жизни сессии
+    (SESSION_COOKIE_AGE в settings.py).
     """
+    error = None
+
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
+        username = request.POST.get("username") or ""
+        password = request.POST.get("password") or ""
+        remember_me = request.POST.get("remember_me")  # 'on' если отмечено, None если нет
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect("home")  # после логина идём на home
+
+            # если галочка НЕ стоит — сессия до закрытия браузера
+            if not remember_me:
+                request.session.set_expiry(0)
+            # если галочка стоит — ничего не делаем, работает стандартный срок
+
+            return redirect("home")
         else:
             error = "Невірний логін або пароль"
-    else:
-        error = None
 
     return render(request, "core/login.html", {"error": error})
 
 
+def logout_view(request):
+    logout(request)
+    return redirect("login")
+
+
+# ---------- HOME ----------
 
 @login_required
 def home(request):
     """
     Главная страница AAP с новостями.
+    Пока новости общие для всех организаций.
     """
     news_list = News.objects.filter(is_published=True).order_by("-created_at")[:5]
-
-    # Жёсткий debug в консоль, чтобы точно видеть, что вьюха вызывается
-    print("DEBUG home(): news_count =", news_list.count())
-
-    return render(request, "core/home.html", {
-        "news_list": news_list,
-    })
+    return render(request, "core/home.html", {"news_list": news_list})
 
 
-@login_required
-def dashboard(request):
-    """
-    Призначені проєкти:
-    - Адмін бачить усіх клієнтів
-    - Звичайний користувач – тільки там, де він у ролі
-    + Фільтри по назві, періоду, предмету завдання та статусу
-    """
-    # базовый queryset с учётом прав доступа
-    if request.user.is_superuser:
-        base_qs = Client.objects.all()
-    else:
-        base_qs = (
-            Client.objects.filter(
-                Q(manager=request.user)
-                | Q(auditor=request.user)
-                | Q(auditor2=request.user)
-                | Q(auditor3=request.user)
-                | Q(assistant=request.user)
-                | Q(assistant2=request.user)
-                | Q(assistant3=request.user)
-                | Q(assistant4=request.user)
-                | Q(qa_manager=request.user)
-            )
-            .distinct()
-        )
-
-    # ---------- читаем фильтры из GET ----------
-    q = (request.GET.get("q") or "").strip()
-    reporting_period = (request.GET.get("reporting_period") or "").strip()
-    status = (request.GET.get("status") or "").strip()
-    subject = (request.GET.get("subject") or "").strip()
-
-    clients = base_qs
-
-    if q:
-        clients = clients.filter(name__icontains=q)
-
-    if reporting_period:
-        clients = clients.filter(reporting_period=reporting_period)
-
-    if status:
-        clients = clients.filter(status=status)
-
-    if subject:
-        clients = clients.filter(engagement_subject=subject)
-
-    clients = clients.order_by("-created_at")
-
-    # ---------- значения для выпадающих фильтров ----------
-    reporting_period_choices = (
-        base_qs.values_list("reporting_period", flat=True)
-        .distinct()
-        .order_by("reporting_period")
-    )
-
-    status_choices = (
-        base_qs.values_list("status", flat=True)
-        .exclude(status__isnull=True)
-        .exclude(status__exact="")
-        .distinct()
-        .order_by("status")
-    )
-
-    subject_codes = (
-        base_qs.values_list("engagement_subject", flat=True)
-        .exclude(engagement_subject__isnull=True)
-        .exclude(engagement_subject__exact="")
-        .distinct()
-        .order_by("engagement_subject")
-    )
-
-    subject_choices = [
-        {
-            "value": code,
-            "label": Client(engagement_subject=code).get_engagement_subject_display(),
-        }
-        for code in subject_codes
-    ]
-
-    # ---------- активный клиент из сессии ----------
-    active_client_id = request.session.get("active_client_id")
-    # приводим к строке, чтобы удобно сравнивать в шаблоне с value инпута
-    active_client_id_str = str(active_client_id) if active_client_id is not None else ""
-
-    context = {
-        "clients": clients,
-        "reporting_period_choices": reporting_period_choices,
-        "status_choices": status_choices,
-        "subject_choices": subject_choices,
-        "active_client_id": active_client_id_str,
-    }
-
-    return render(request, "core/dashboard.html", context)
-
-
-
-
-
-
-
-# ---------- Команда клиента (часы/бюджет) ----------
+# ---------- TEAM / БЮДЖЕТ ----------
 
 @login_required
 def client_team(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(
+        Client,
+        pk=pk,
+        organization=request.organization,
+    )
 
-    # проверка доступа
     if not request.user.is_superuser:
         if not (
             client.manager == request.user
@@ -386,7 +284,7 @@ def client_team(request, pk):
         }
     )
 
-    # Аудиторы (0.47 суммарно, делим между не-null)
+    # Аудиторы (0.47)
     auditors = [
         ("Аудитор 1", client.auditor),
         ("Аудитор 2", client.auditor2),
@@ -415,7 +313,7 @@ def client_team(request, pk):
             }
         )
 
-    # Ассистенты (0.40 суммарно)
+    # Ассистенты (0.40)
     assistants = [
         ("Асистент 1", client.assistant),
         ("Асистент 2", client.assistant2),
@@ -465,7 +363,7 @@ def client_team(request, pk):
     return render(request, "core/client_team.html", context)
 
 
-# ---------- Создание / просмотр / редактирование / удаление клиента ----------
+# ---------- CRUD КЛИЕНТА ----------
 
 @login_required
 def client_create(request):
@@ -476,19 +374,30 @@ def client_create(request):
     if request.method == "POST":
         form = ClientForm(request.POST)
         if form.is_valid():
-            form.save()
+            client = form.save(commit=False)
+            client.organization = request.organization
+            client.save()
             return redirect("dashboard")
+        else:
+            # >>> ДОБАВЛЕНО: вывод ошибок в консоль
+            print("\n=== FORM ERRORS (client_create) ===")
+            print(form.errors.as_json())
+            print("=== END FORM ERRORS ===\n")
     else:
         form = ClientForm()
 
     return render(request, "core/client_form.html", {"form": form})
 
 
+
 @login_required
 def client_detail(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(
+        Client,
+        pk=pk,
+        organization=request.organization,
+    )
 
-    # доступ только админу или участникам команды
     if not request.user.is_superuser:
         if not (
             client.manager == request.user
@@ -503,21 +412,17 @@ def client_detail(request, pk):
         ):
             return redirect("dashboard")
 
-    return render(
-        request,
-        "core/client_detail.html",
-        {
-            "client": client,
-        },
-    )
-
+    return render(request, "core/client_detail.html", {"client": client})
 
 
 @login_required
 def client_edit(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(
+        Client,
+        pk=pk,
+        organization=request.organization,
+    )
 
-    # редактирование – админ или участник команды
     if not request.user.is_superuser:
         if not (
             client.manager == request.user
@@ -553,9 +458,12 @@ def client_edit(request, pk):
 
 @login_required
 def client_delete(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(
+        Client,
+        pk=pk,
+        organization=request.organization,
+    )
 
-    # удалять может только админ
     if not request.user.is_superuser:
         return redirect("dashboard")
 
@@ -566,21 +474,17 @@ def client_delete(request, pk):
     return render(request, "core/client_confirm_delete.html", {"client": client})
 
 
-# ---------- Страница «Запити» / генерация DOCX ----------
+# ---------- ЗАПИТИ / ГЕНЕРАЦИЯ DOCX ----------
 
 @login_required
 def requests_view(request):
     """
     Страница «Запити».
-
-    Клиент берётся из active_client_id в сессии (ставится галочкой на dashboard).
-    Никаких выпадающих списков, только 3 кнопки генерации документов
-    для уже выбранного проекта.
+    Клиент берётся из active_client_id в сессии.
     """
 
-    # те же клиенты, что пользователь видит на dashboard
     if request.user.is_superuser:
-        clients_qs = Client.objects.all()
+        clients_qs = Client.objects.filter(organization=request.organization)
     else:
         clients_qs = (
             Client.objects.filter(
@@ -592,47 +496,40 @@ def requests_view(request):
                 | Q(assistant2=request.user)
                 | Q(assistant3=request.user)
                 | Q(assistant4=request.user)
-                | Q(qa_manager=request.user)
+                | Q(qa_manager=request.user),
+                organization=request.organization,
             )
             .distinct()
         )
 
-    # активный клиент из сессии
     active_client_id = request.session.get("active_client_id")
     selected_client = (
         clients_qs.filter(id=active_client_id).first() if active_client_id else None
     )
 
-    # если ничего не выбрано – просто показываем шаблон с сообщением
     if request.method == "GET":
         return render(
             request,
             "core/requests.html",
-            {
-                "selected_client": selected_client,
-            },
+            {"selected_client": selected_client},
         )
 
-    # ------- POST: сформировать документ для выбранного клиента -------
-
     if not selected_client:
-        # на всякий случай: запрос пришёл без выбранного проекта
         return redirect("requests")
 
-    doc_type = request.POST.get("doc_type")  # remembrance_team / team_independence / order
+    doc_type = request.POST.get("doc_type")
     if doc_type not in {"remembrance_team", "team_independence", "order"}:
         return redirect("requests")
 
     client = selected_client
 
-    # выбор шаблона
     if doc_type == "remembrance_team":
         template_name = "remembrance_team.docx"
         download_name = f"remembrance_team_{client.id}.docx"
     elif doc_type == "team_independence":
         template_name = "team_independence.docx"
         download_name = f"team_independence_{client.id}.docx"
-    else:  # "order"
+    else:
         template_name = "order.docx"
         download_name = f"order_{client.id}.docx"
 
@@ -663,12 +560,11 @@ def requests_view(request):
         "{{ CURRENT_USER }}": request.user.get_full_name() or request.user.username,
     }
 
-    # генерируем DOCX
     file_obj = fill_docx(template_path, context_doc)
     file_bytes = file_obj.getvalue()
 
-    # сохраняем в ClientDocument
     doc_record = ClientDocument(
+        organization=request.organization,
         client=client,
         uploaded_by=request.user,
         doc_type=doc_type_code,
@@ -676,21 +572,19 @@ def requests_view(request):
     )
     doc_record.file.save(download_name, ContentFile(file_bytes), save=True)
 
-    # и сразу переходим в Базу документів этого клиента
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client.id}")
 
 
-
-
-
-
+# ---------- ДОКУМЕНТЫ ----------
 
 @login_required
 def documents_view(request):
     # 1. Клиенты, доступные пользователю
     if request.user.is_superuser:
-        clients = Client.objects.all().order_by("name")
+        clients = Client.objects.filter(
+            organization=request.organization
+        ).order_by("name")
     else:
         clients = (
             Client.objects.filter(
@@ -702,13 +596,13 @@ def documents_view(request):
                 | Q(assistant2=request.user)
                 | Q(assistant3=request.user)
                 | Q(assistant4=request.user)
-                | Q(qa_manager=request.user)
+                | Q(qa_manager=request.user),
+                organization=request.organization,
             )
             .distinct()
             .order_by("name")
         )
 
-    # если вообще нет клиентов
     if not clients.exists():
         return render(
             request,
@@ -722,7 +616,6 @@ def documents_view(request):
             },
         )
 
-    # ---------- данные для JS (если ещё используешь) ----------
     clients_list = []
     for c in clients:
         clients_list.append(
@@ -739,12 +632,7 @@ def documents_view(request):
         )
     clients_json = json.dumps(clients_list, ensure_ascii=False)
 
-    # ---------- определяем выбранного клиента ----------
-
-    # 1) пробуем взять из GET (если вдруг ?client_id=... всё ещё используется)
     client_id = request.GET.get("client_id")
-
-    # 2) если нет — берём активного з dashboard
     if not client_id:
         client_id = request.session.get("active_client_id")
 
@@ -752,13 +640,13 @@ def documents_view(request):
     if client_id:
         selected_client = clients.filter(id=client_id).first()
 
-    # ---------- загрузка файла (POST) ----------
+    # загрузка файла
     if request.method == "POST" and request.POST.get("action") == "upload":
-        # сюда придём только когда уже выбран клиент
         if selected_client:
             file = request.FILES.get("file")
             if file:
                 ClientDocument.objects.create(
+                    organization=request.organization,
                     client=selected_client,
                     file=file,
                     original_name=file.name,
@@ -773,10 +661,12 @@ def documents_view(request):
         else:
             return redirect(docs_url)
 
-    # ---------- список документов выбранного клиента ----------
     if selected_client:
         documents = (
-            ClientDocument.objects.filter(client=selected_client)
+            ClientDocument.objects.filter(
+                organization=request.organization,
+                client=selected_client,
+            )
             .order_by("-created_at")
         )
     else:
@@ -795,18 +685,19 @@ def documents_view(request):
     )
 
 
-
-
-
 @login_required
 def document_update_type(request, doc_id):
     """
     Обновляет тип и мітку конкретного документа из строки таблицы.
     """
-    doc = get_object_or_404(ClientDocument, pk=doc_id)
+    doc = get_object_or_404(
+        ClientDocument,
+        pk=doc_id,
+        organization=request.organization,
+    )
 
-    # проверка доступа: пользователь должен иметь доступ к клиенту
     client = doc.client
+
     if not request.user.is_superuser:
         if not (
             client.manager == request.user
@@ -835,29 +726,22 @@ def document_delete(request, pk):
     Удаление документа клиента:
     - удаляет файл с диска
     - удаляет запись из базы
-    Доступ: суперюзер или тот, кто загрузил документ.
     """
-    doc = get_object_or_404(ClientDocument, pk=pk)
+    doc = get_object_or_404(
+        ClientDocument,
+        pk=pk,
+        organization=request.organization,
+    )
     client_id = doc.client_id
 
-    # Простая проверка прав
     if not request.user.is_superuser and doc.uploaded_by != request.user:
         documents_url = reverse("documents")
         return redirect(f"{documents_url}?client_id={client_id}")
 
     if request.method == "POST":
-        # удалить физический файл
         if doc.file:
             doc.file.delete(save=False)
-        # удалить запись
         doc.delete()
 
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client_id}")
-
-
-# ---------- logout ----------
-
-def logout_view(request):
-    logout(request)
-    return redirect("login")

@@ -479,3 +479,21 @@ input[type="submit"].btn-primary {
     width: 320px;       /* фиксированная удобная ширина */
     max-width: 420px;   /* если захочешь, можно больше */
 }
+/* required-input сам по себе ничего не красит,
+   используется только для логики, если понадобится */
+.required-input {
+    /* пусто специально */
+}
+
+.has-error input,
+.has-error select,
+.has-error textarea {
+    border-color: #dc3545 !important;
+    background-color: #f8d7da !important;
+}
+
+.field-error {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 3px;
+}

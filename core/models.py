@@ -3,6 +3,17 @@ from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 
 
+class Organization(models.Model):
+    name = models.CharField("Назва організації", max_length=255, unique=True)
+    # В будущем сюда можно добавить:
+    # logo = models.ImageField(upload_to="org_logos/", null=True, blank=True)
+    # domain = models.CharField(max_length=255, null=True, blank=True)
+    # settings_json = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 # =================== СПРАВОЧНИКИ ===================
 
 ASSIGNMENT_SUBJECT_CHOICES = [
@@ -17,7 +28,6 @@ ASSIGNMENT_SUBJECT_CHOICES = [
     ("RELATED", _("Супутні послуги")),
     ("NON_AUDIT", _("Інші неаудиторські послуги")),
 ]
-
 
 LEGAL_FORM_CHOICES = [
     ("FOP", _("Фізична особа-підприємець")),
@@ -45,7 +55,6 @@ LEGAL_FORM_CHOICES = [
     ("PAO", _("Публічні акціонерні товариства")),
     ("APU", _("Аудиторська палата України")),
 ]
-
 
 SUPERVISORY_BODY_CHOICES = [
     ("AGRARIAN", _("Міністерство аграрної політики та продовольства України")),
@@ -88,13 +97,11 @@ SUPERVISORY_BODY_CHOICES = [
     ("NBU", _("Національний банк України")),
 ]
 
-
 REPORT_TYPE_CHOICES = [
     ("QUALIFIED", _("Думка із застереженням")),
     ("ADVERSE", _("Негативна думка")),
     ("DISCLAIMER", _("Відмова від висловлення думки")),
 ]
-
 
 REPORT_PARAGRAPH_CHOICES = [
     ("OTHER", _("Параграф: Інше")),
@@ -105,6 +112,15 @@ REPORT_PARAGRAPH_CHOICES = [
 # =================== МОДЕЛЬ CLIENT ===================
 
 class Client(models.Model):
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="clients",
+        verbose_name=_("Організація"),
+        null=True,
+        blank=True,
+    )
+
     # Основні дані
     name = models.CharField(_("Повна назва клієнта"), max_length=255)
     edrpou = models.CharField(_("ЄДРПОУ"), max_length=20, blank=True, null=True)
@@ -128,8 +144,20 @@ class Client(models.Model):
     requisites_vat = models.DecimalField(_("ПДВ"), max_digits=14, decimal_places=2, blank=True, null=True)
 
     # Нагляд, форма власності
-    supervision_body = models.CharField(_("Орган нагляду"), max_length=255, choices=SUPERVISORY_BODY_CHOICES, blank=True, null=True)
-    legal_form = models.CharField(_("Організаційно-правова форма"), max_length=255, choices=LEGAL_FORM_CHOICES, blank=True, null=True)
+    supervision_body = models.CharField(
+        _("Орган нагляду"),
+        max_length=255,
+        choices=SUPERVISORY_BODY_CHOICES,
+        blank=True,
+        null=True,
+    )
+    legal_form = models.CharField(
+        _("Організаційно-правова форма"),
+        max_length=255,
+        choices=LEGAL_FORM_CHOICES,
+        blank=True,
+        null=True,
+    )
     mandatory_audit = models.BooleanField(_("Обов'язковий аудит (огляд)"), default=False)
 
     # Період
@@ -137,7 +165,13 @@ class Client(models.Model):
     contract_deadline = models.DateField(_("Кінцевий строк виконання договору"), blank=True, null=True)
 
     # Предмет завдання
-    engagement_subject = models.CharField(_("Предмет завдання"), max_length=100, choices=ASSIGNMENT_SUBJECT_CHOICES, blank=True, null=True)
+    engagement_subject = models.CharField(
+        _("Предмет завдання"),
+        max_length=100,
+        choices=ASSIGNMENT_SUBJECT_CHOICES,
+        blank=True,
+        null=True,
+    )
 
     # Уповноважена особа
     authorized_person_name = models.CharField(_("ПІБ уповноваженої особи"), max_length=255, blank=True, null=True)
@@ -146,8 +180,20 @@ class Client(models.Model):
     # Аудиторський звіт
     audit_report_number = models.CharField(_("№ аудиторського звіту"), max_length=100, blank=True, null=True)
     audit_report_date = models.DateField(_("Дата аудиторського звіту"), blank=True, null=True)
-    audit_report_type = models.CharField(_("Вид аудиторського звіту"), max_length=255, choices=REPORT_TYPE_CHOICES, blank=True, null=True)
-    audit_report_paragraph = models.CharField(_("Параграф аудиторського звіту"), max_length=255, choices=REPORT_PARAGRAPH_CHOICES, blank=True, null=True)
+    audit_report_type = models.CharField(
+        _("Вид аудиторського звіту"),
+        max_length=255,
+        choices=REPORT_TYPE_CHOICES,
+        blank=True,
+        null=True,
+    )
+    audit_report_paragraph = models.CharField(
+        _("Параграф аудиторського звіту"),
+        max_length=255,
+        choices=REPORT_PARAGRAPH_CHOICES,
+        blank=True,
+        null=True,
+    )
 
     supervision_notice_date = models.DateField(_("Дата повідомлення органу нагляду"), blank=True, null=True)
 
@@ -160,17 +206,80 @@ class Client(models.Model):
     status = models.CharField(_("Статус"), max_length=50, default="new")
 
     # Команда
-    manager = models.ForeignKey(User, verbose_name=_("Менеджер"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_manager")
-    auditor = models.ForeignKey(User, verbose_name=_("Аудитор 1"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_auditor1")
-    auditor2 = models.ForeignKey(User, verbose_name=_("Аудитор 2"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_auditor2")
-    auditor3 = models.ForeignKey(User, verbose_name=_("Аудитор 3"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_auditor3")
+    manager = models.ForeignKey(
+        User,
+        verbose_name=_("Менеджер"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_manager",
+    )
+    auditor = models.ForeignKey(
+        User,
+        verbose_name=_("Аудитор 1"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_auditor1",
+    )
+    auditor2 = models.ForeignKey(
+        User,
+        verbose_name=_("Аудитор 2"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_auditor2",
+    )
+    auditor3 = models.ForeignKey(
+        User,
+        verbose_name=_("Аудитор 3"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_auditor3",
+    )
 
-    assistant = models.ForeignKey(User, verbose_name=_("Асистент 1"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_assistant1")
-    assistant2 = models.ForeignKey(User, verbose_name=_("Асистент 2"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_assistant2")
-    assistant3 = models.ForeignKey(User, verbose_name=_("Асистент 3"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_assistant3")
-    assistant4 = models.ForeignKey(User, verbose_name=_("Асистент 4"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_assistant4")
+    assistant = models.ForeignKey(
+        User,
+        verbose_name=_("Асистент 1"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_assistant1",
+    )
+    assistant2 = models.ForeignKey(
+        User,
+        verbose_name=_("Асистент 2"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_assistant2",
+    )
+    assistant3 = models.ForeignKey(
+        User,
+        verbose_name=_("Асистент 3"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_assistant3",
+    )
+    assistant4 = models.ForeignKey(
+        User,
+        verbose_name=_("Асистент 4"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_assistant4",
+    )
 
-    qa_manager = models.ForeignKey(User, verbose_name=_("Менеджер КК"), on_delete=models.SET_NULL, null=True, blank=True, related_name="clients_as_qa_manager")
+    qa_manager = models.ForeignKey(
+        User,
+        verbose_name=_("Менеджер КК"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clients_as_qa_manager",
+    )
 
     # строки с username для импорта
     manager_username = models.CharField("Менеджер (username)", max_length=150, blank=True)
@@ -186,6 +295,10 @@ class Client(models.Model):
     # Службова інформація
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Оновлено"), auto_now=True)
+
+    # Дополнительные поля (если реально нужны)
+    task_subject = models.CharField("Предмет завдання", max_length=255, blank=True)
+    deadline = models.DateField("Кінцевий строк виконання договору", null=True, blank=True)
 
     def display_label(self):
         """
@@ -207,21 +320,6 @@ class Client(models.Model):
 
     def __str__(self):
         return self.display_label()
-    
-    task_subject = models.CharField(
-        "Предмет завдання",
-        max_length=255,
-        blank=True
-    )
-    
-    deadline = models.DateField(
-        "Кінцевий строк виконання договору",
-        null=True,
-        blank=True
-    )
-
-    def __str__(self):
-        return self.name
 
 
 # =================== МОДЕЛЬ ДОКУМЕНТОВ ===================
@@ -235,23 +333,42 @@ class ClientDocument(models.Model):
         ("other", "Інше"),
     ]
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="documents", verbose_name=_("Клієнт"))
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="documents",
+        verbose_name=_("Організація"),
+        null=True,
+        blank=True,
+    )
+
+    client = models.ForeignKey(
+        "Client",
+        on_delete=models.CASCADE,
+        related_name="documents",
+        verbose_name=_("Клієнт"),
+    )
     file = models.FileField(upload_to="client_docs/", verbose_name=_("Файл"))
     original_name = models.CharField(_("Оригінальна назва"), max_length=255, blank=True, null=True)
     doc_type = models.CharField(_("Тип документа"), max_length=50, choices=DOC_TYPE_CHOICES, blank=True, null=True)
     custom_label = models.CharField(_("Мітка / примітка"), max_length=255, blank=True, null=True)
-    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Користувач, який завантажив"))
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Користувач, який завантажив"),
+    )
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
 
     def __str__(self):
         return self.original_name or f"Документ #{self.pk}"
 
-from django.db import models
 
 class News(models.Model):
     title = models.CharField("Заголовок", max_length=255)
     body = models.TextField("Текст", blank=True)
-    image = models.ImageField("Зображення", upload_to='news/', blank=True, null=True)  # ← добавили
+    image = models.ImageField("Зображення", upload_to="news/", blank=True, null=True)
     link = models.URLField("Ссылка (опціонально)", blank=True)
     is_published = models.BooleanField("Опубліковано", default=True)
     created_at = models.DateTimeField("Створено", auto_now_add=True)

@@ -26,87 +26,454 @@
     {% endif %}
 </h1>
 
-<form method="post">
+<form method="post" novalidate>
     {% csrf_token %}
 
     {% if form.non_field_errors %}
-        <div class="error">
+        <div class="field-error">
             {{ form.non_field_errors }}
         </div>
     {% endif %}
 
     <h2>{% trans "Основні дані" %}</h2>
-    <p>
-        <label>
-            <strong>{% trans "Найменування:" %}</strong><br>
-            {{ form.name }}{{ form.name.errors }}
-        </label>
+
+    <p class="{% if form.name.errors %}has-error{% endif %}">
+        <label for="{{ form.name.id_for_label }}">
+            <strong>
+                {% trans "Найменування:" %}
+                {% if form.name.field.required %}<span class="text-danger">*</span>{% endif %}
+            </strong>
+        </label><br>
+        {{ form.name }}
+        {% if form.name.errors %}
+            <div class="field-error">{{ form.name.errors }}</div>
+        {% endif %}
     </p>
-    <p>
-        <label>
-            <strong>{% trans "ЄДРПОУ:" %}</strong><br>
-            {{ form.edrpou }}{{ form.edrpou.errors }}
-        </label>
+
+    <p class="{% if form.edrpou.errors %}has-error{% endif %}">
+        <label for="{{ form.edrpou.id_for_label }}">
+            <strong>
+                {% trans "ЄДРПОУ:" %}
+                {% if form.edrpou.field.required %}<span class="text-danger">*</span>{% endif %}
+            </strong>
+        </label><br>
+        {{ form.edrpou }}
+        {% if form.edrpou.errors %}
+            <div class="field-error">{{ form.edrpou.errors }}</div>
+        {% endif %}
     </p>
 
     <h2>{% trans "Адреса (місцезнаходження)" %}</h2>
-    <p><label>{% trans "Країна:" %}<br>{{ form.address_country }}{{ form.address_country.errors }}</label></p>
-    <p><label>{% trans "Місто:" %}<br>{{ form.address_city }}{{ form.address_city.errors }}</label></p>
-    <p><label>{% trans "Вулиця:" %}<br>{{ form.address_street }}{{ form.address_street.errors }}</label></p>
-    <p><label>{% trans "Будинок/корпус:" %}<br>{{ form.address_building }}{{ form.address_building.errors }}</label></p>
-    <p><label>{% trans "Офіс:" %}<br>{{ form.address_office }}{{ form.address_office.errors }}</label></p>
-    <p><label>{% trans "Індекс:" %}<br>{{ form.address_zip }}{{ form.address_zip.errors }}</label></p>
+
+    <p class="{% if form.address_country.errors %}has-error{% endif %}">
+        <label for="{{ form.address_country.id_for_label }}">
+            {% trans "Країна:" %}
+            {% if form.address_country.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_country }}
+        {% if form.address_country.errors %}
+            <div class="field-error">{{ form.address_country.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.address_city.errors %}has-error{% endif %}">
+        <label for="{{ form.address_city.id_for_label }}">
+            {% trans "Місто:" %}
+            {% if form.address_city.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_city }}
+        {% if form.address_city.errors %}
+            <div class="field-error">{{ form.address_city.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.address_street.errors %}has-error{% endif %}">
+        <label for="{{ form.address_street.id_for_label }}">
+            {% trans "Вулиця:" %}
+            {% if form.address_street.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_street }}
+        {% if form.address_street.errors %}
+            <div class="field-error">{{ form.address_street.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.address_building.errors %}has-error{% endif %}">
+        <label for="{{ form.address_building.id_for_label }}">
+            {% trans "Будинок/корпус:" %}
+            {% if form.address_building.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_building }}
+        {% if form.address_building.errors %}
+            <div class="field-error">{{ form.address_building.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.address_office.errors %}has-error{% endif %}">
+        <label for="{{ form.address_office.id_for_label }}">
+            {% trans "Офіс:" %}
+            {% if form.address_office.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_office }}
+        {% if form.address_office.errors %}
+            <div class="field-error">{{ form.address_office.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.address_zip.errors %}has-error{% endif %}">
+        <label for="{{ form.address_zip.id_for_label }}">
+            {% trans "Індекс:" %}
+            {% if form.address_zip.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.address_zip }}
+        {% if form.address_zip.errors %}
+            <div class="field-error">{{ form.address_zip.errors }}</div>
+        {% endif %}
+    </p>
+    
 
     <h2>{% trans "КВЕД та ПОІ" %}</h2>
-    <p><label>{% trans "КВЕД:" %}<br>{{ form.kved }}{{ form.kved.errors }}</label></p>
-    <p><label>{% trans "ПОІ:" %} {{ form.poi }}{{ form.poi.errors }}</label></p>
+
+    <p class="{% if form.kved.errors %}has-error{% endif %}">
+        <label for="{{ form.kved.id_for_label }}">
+            {% trans "КВЕД:" %}
+            {% if form.kved.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.kved }}
+        {% if form.kved.errors %}
+            <div class="field-error">{{ form.kved.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.poi.errors %}has-error{% endif %}">
+        <label for="{{ form.poi.id_for_label }}">
+            {% trans "ПСІ:" %}
+        </label>
+        {{ form.poi }}
+        {% if form.poi.errors %}
+            <div class="field-error">{{ form.poi.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Реквізити договору" %}</h2>
-    <p><label>{% trans "№ договору/документа:" %}<br>{{ form.requisites_number }}{{ form.requisites_number.errors }}</label></p>
-    <p><label>{% trans "Дата договору/документа:" %}<br>{{ form.requisites_date }}{{ form.requisites_date.errors }}</label></p>
-    <p><label>{% trans "Сума:" %}<br>{{ form.requisites_amount }}{{ form.requisites_amount.errors }}</label></p>
-    <p><label>{% trans "ПДВ:" %}<br>{{ form.requisites_vat }}{{ form.requisites_vat.errors }}</label></p>
-    <p><label>{% trans "Робочі години (план):" %}<br>{{ form.planned_hours }} {{ form.planned_hours.errors }}</label></p>
+
+    <p class="{% if form.requisites_number.errors %}has-error{% endif %}">
+        <label for="{{ form.requisites_number.id_for_label }}">
+            {% trans "№ договору/документа:" %}
+            {% if form.requisites_number.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.requisites_number }}
+        {% if form.requisites_number.errors %}
+            <div class="field-error">{{ form.requisites_number.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.requisites_date.errors %}has-error{% endif %}">
+        <label for="{{ form.requisites_date.id_for_label }}">
+            {% trans "Дата договору/документа:" %}
+            {% if form.requisites_date.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.requisites_date }}
+        {% if form.requisites_date.errors %}
+            <div class="field-error">{{ form.requisites_date.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.requisites_amount.errors %}has-error{% endif %}">
+        <label for="{{ form.requisites_amount.id_for_label }}">
+            {% trans "Сума:" %}
+            {% if form.requisites_amount.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.requisites_amount }}
+        {% if form.requisites_amount.errors %}
+            <div class="field-error">{{ form.requisites_amount.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.requisites_vat.errors %}has-error{% endif %}">
+        <label for="{{ form.requisites_vat.id_for_label }}">
+            {% trans "ПДВ:" %}
+            {% if form.requisites_vat.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.requisites_vat }}
+        {% if form.requisites_vat.errors %}
+            <div class="field-error">{{ form.requisites_vat.errors }}</div>
+        {% endif %}
+    </p>
+    
+
+    <p class="{% if form.planned_hours.errors %}has-error{% endif %}">
+        <label for="{{ form.planned_hours.id_for_label }}">
+            {% trans "Робочі години (план):" %}
+            {% if form.planned_hours.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.planned_hours }}
+        {% if form.planned_hours.errors %}
+            <div class="field-error">{{ form.planned_hours.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Нагляд, ОПФ, обов'язковий аудит" %}</h2>
-    <p><label>{% trans "Орган нагляду:" %}<br>{{ form.supervision_body }}{{ form.supervision_body.errors }}</label></p>
-    <p><label>{% trans "Організаційно-правова форма:" %}<br>{{ form.legal_form }}{{ form.legal_form.errors }}</label></p>
-    <p><label>{% trans "Обов'язковий аудит (огляд):" %} {{ form.mandatory_audit }}{{ form.mandatory_audit.errors }}</label></p>
+
+    <p class="{% if form.supervision_body.errors %}has-error{% endif %}">
+        <label for="{{ form.supervision_body.id_for_label }}">
+            {% trans "Орган нагляду:" %}
+            {% if form.supervision_body.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.supervision_body }}
+        {% if form.supervision_body.errors %}
+            <div class="field-error">{{ form.supervision_body.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.legal_form.errors %}has-error{% endif %}">
+        <label for="{{ form.legal_form.id_for_label }}">
+            {% trans "Організаційно-правова форма:" %}
+            {% if form.legal_form.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.legal_form }}
+        {% if form.legal_form.errors %}
+            <div class="field-error">{{ form.legal_form.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.mandatory_audit.errors %}has-error{% endif %}">
+        <label for="{{ form.mandatory_audit.id_for_label }}">
+            {% trans "Обов'язковий аудит (огляд):" %}
+        </label>
+        {{ form.mandatory_audit }}
+        {% if form.mandatory_audit.errors %}
+            <div class="field-error">{{ form.mandatory_audit.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Період та строк" %}</h2>
-    <p><label>{% trans "Звітний період:" %}<br>{{ form.reporting_period }}{{ form.reporting_period.errors }}</label></p>
-    <p><label>{% trans "Кінцевий строк виконання договору:" %}<br>{{ form.contract_deadline }}{{ form.contract_deadline.errors }}</label></p>
+
+    <p class="{% if form.reporting_period.errors %}has-error{% endif %}">
+        <label for="{{ form.reporting_period.id_for_label }}">
+            {% trans "Звітний період:" %}
+            {% if form.reporting_period.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.reporting_period }}
+        {% if form.reporting_period.errors %}
+            <div class="field-error">{{ form.reporting_period.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.contract_deadline.errors %}has-error{% endif %}">
+        <label for="{{ form.contract_deadline.id_for_label }}">
+            {% trans "Кінцевий строк виконання договору:" %}
+            {% if form.contract_deadline.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.contract_deadline }}
+        {% if form.contract_deadline.errors %}
+            <div class="field-error">{{ form.contract_deadline.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Предмет завдання" %}</h2>
-    <p><label>{{ form.engagement_subject }}{{ form.engagement_subject.errors }}</label></p>
+
+    <p class="{% if form.engagement_subject.errors %}has-error{% endif %}">
+        <label for="{{ form.engagement_subject.id_for_label }}">
+            {% trans "Предмет завдання:" %}
+            {% if form.engagement_subject.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.engagement_subject }}
+        {% if form.engagement_subject.errors %}
+            <div class="field-error">{{ form.engagement_subject.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Уповноважена особа клієнта" %}</h2>
-    <p><label>{% trans "ПІБ:" %}<br>{{ form.authorized_person_name }}{{ form.authorized_person_name.errors }}</label></p>
-    <p><label>Email:<br>{{ form.authorized_person_email }}{{ form.authorized_person_email.errors }}</label></p>
+
+    <p class="{% if form.authorized_person_name.errors %}has-error{% endif %}">
+        <label for="{{ form.authorized_person_name.id_for_label }}">
+            {% trans "ПІБ:" %}
+            {% if form.authorized_person_name.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.authorized_person_name }}
+        {% if form.authorized_person_name.errors %}
+            <div class="field-error">{{ form.authorized_person_name.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.authorized_person_email.errors %}has-error{% endif %}">
+        <label for="{{ form.authorized_person_email.id_for_label }}">
+            Email:
+            {% if form.authorized_person_email.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.authorized_person_email }}
+        {% if form.authorized_person_email.errors %}
+            <div class="field-error">{{ form.authorized_person_email.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Дані аудиторського звіту" %}</h2>
-    <p><label>{% trans "№ аудиторського звіту:" %}<br>{{ form.audit_report_number }}{{ form.audit_report_number.errors }}</label></p>
-    <p><label>{% trans "Дата аудиторського звіту:" %}<br>{{ form.audit_report_date }}{{ form.audit_report_date.errors }}</label></p>
-    <p><label>{% trans "Вид:" %}<br>{{ form.audit_report_type }}{{ form.audit_report_type.errors }}</label></p>
-    <p><label>{% trans "Параграф:" %}<br>{{ form.audit_report_paragraph }}{{ form.audit_report_paragraph.errors }}</label></p>
-    <p><label>{% trans "Дата повідомлення до органу нагляду:" %}<br>{{ form.supervision_notice_date }}{{ form.supervision_notice_date.errors }}</label></p>
-    <p><label>{% trans "Контрольні процедури в CW виконані:" %} {{ form.cw_controls_done }}{{ form.cw_controls_done.errors }}</label></p>
+
+    <p class="{% if form.audit_report_number.errors %}has-error{% endif %}">
+        <label for="{{ form.audit_report_number.id_for_label }}">
+            {% trans "№ аудиторського звіту:" %}
+        </label><br>
+        {{ form.audit_report_number }}
+        {% if form.audit_report_number.errors %}
+            <div class="field-error">{{ form.audit_report_number.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.audit_report_date.errors %}has-error{% endif %}">
+        <label for="{{ form.audit_report_date.id_for_label }}">
+            {% trans "Дата аудиторського звіту:" %}
+        </label><br>
+        {{ form.audit_report_date }}
+        {% if form.audit_report_date.errors %}
+            <div class="field-error">{{ form.audit_report_date.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.audit_report_type.errors %}has-error{% endif %}">
+        <label for="{{ form.audit_report_type.id_for_label }}">
+            {% trans "Вид:" %}
+        </label><br>
+        {{ form.audit_report_type }}
+        {% if form.audit_report_type.errors %}
+            <div class="field-error">{{ form.audit_report_type.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.audit_report_paragraph.errors %}has-error{% endif %}">
+        <label for="{{ form.audit_report_paragraph.id_for_label }}">
+            {% trans "Параграф:" %}
+        </label><br>
+        {{ form.audit_report_paragraph }}
+        {% if form.audit_report_paragraph.errors %}
+            <div class="field-error">{{ form.audit_report_paragraph.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.supervision_notice_date.errors %}has-error{% endif %}">
+        <label for="{{ form.supervision_notice_date.id_for_label }}">
+            {% trans "Дата повідомлення до органу нагляду:" %}
+        </label><br>
+        {{ form.supervision_notice_date }}
+        {% if form.supervision_notice_date.errors %}
+            <div class="field-error">{{ form.supervision_notice_date.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.cw_controls_done.errors %}has-error{% endif %}">
+        <label for="{{ form.cw_controls_done.id_for_label }}">
+            {% trans "Контрольні процедури в CW виконані:" %}
+        </label>
+        {{ form.cw_controls_done }}
+        {% if form.cw_controls_done.errors %}
+            <div class="field-error">{{ form.cw_controls_done.errors }}</div>
+        {% endif %}
+    </p>
 
     <h2>{% trans "Статус та команда" %}</h2>
-    <p><label>{% trans "Статус:" %}<br>{{ form.status }}{{ form.status.errors }}</label></p>
 
-    <p><label>{% trans "Менеджер:" %}<br>{{ form.manager }}{{ form.manager.errors }}</label></p>
+    <p class="{% if form.status.errors %}has-error{% endif %}">
+        <label for="{{ form.status.id_for_label }}">
+            {% trans "Статус:" %}
+            {% if form.status.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.status }}
+        {% if form.status.errors %}
+            <div class="field-error">{{ form.status.errors }}</div>
+        {% endif %}
+    </p>
 
-    <p><label>{% trans "Аудитор 1:" %}<br>{{ form.auditor }}{{ form.auditor.errors }}</label></p>
-    <p><label>{% trans "Аудитор 2:" %}<br>{{ form.auditor2 }}{{ form.auditor2.errors }}</label></p>
-    <p><label>{% trans "Аудитор 3:" %}<br>{{ form.auditor3 }}{{ form.auditor3.errors }}</label></p>
+    <p class="{% if form.manager.errors %}has-error{% endif %}">
+        <label for="{{ form.manager.id_for_label }}">
+            {% trans "Менеджер:" %}
+            {% if form.manager.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.manager }}
+        {% if form.manager.errors %}
+            <div class="field-error">{{ form.manager.errors }}</div>
+        {% endif %}
+    </p>
 
-    <p><label>{% trans "Асистент 1:" %}<br>{{ form.assistant }}{{ form.assistant.errors }}</label></p>
-    <p><label>{% trans "Асистент 2:" %}<br>{{ form.assistant2 }}{{ form.assistant2.errors }}</label></p>
-    <p><label>{% trans "Асистент 3:" %}<br>{{ form.assistant3 }}{{ form.assistant3.errors }}</label></p>
-    <p><label>{% trans "Асистент 4:" %}<br>{{ form.assistant4 }}{{ form.assistant4.errors }}</label></p>
+    <p class="{% if form.auditor.errors %}has-error{% endif %}">
+        <label for="{{ form.auditor.id_for_label }}">
+            {% trans "Аудитор 1:" %}
+        </label><br>
+        {{ form.auditor }}
+        {% if form.auditor.errors %}
+            <div class="field-error">{{ form.auditor.errors }}</div>
+        {% endif %}
+    </p>
 
-    <p><label>{% trans "Менеджер КК:" %}<br>{{ form.qa_manager }}{{ form.qa_manager.errors }}</label></p>
+    <p class="{% if form.auditor2.errors %}has-error{% endif %}">
+        <label for="{{ form.auditor2.id_for_label }}">
+            {% trans "Аудитор 2:" %}
+        </label><br>
+        {{ form.auditor2 }}
+        {% if form.auditor2.errors %}
+            <div class="field-error">{{ form.auditor2.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.auditor3.errors %}has-error{% endif %}">
+        <label for="{{ form.auditor3.id_for_label }}">
+            {% trans "Аудитор 3:" %}
+        </label><br>
+        {{ form.auditor3 }}
+        {% if form.auditor3.errors %}
+            <div class="field-error">{{ form.auditor3.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.assistant.errors %}has-error{% endif %}">
+        <label for="{{ form.assistant.id_for_label }}">
+            {% trans "Асистент 1:" %}
+        </label><br>
+        {{ form.assistant }}
+        {% if form.assistant.errors %}
+            <div class="field-error">{{ form.assistant.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.assistant2.errors %}has-error{% endif %}">
+        <label for="{{ form.assistant2.id_for_label }}">
+            {% trans "Асистент 2:" %}
+        </label><br>
+        {{ form.assistant2 }}
+        {% if form.assistant2.errors %}
+            <div class="field-error">{{ form.assistant2.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.assistant3.errors %}has-error{% endif %}">
+        <label for="{{ form.assistant3.id_for_label }}">
+            {% trans "Асистент 3:" %}
+        </label><br>
+        {{ form.assistant3 }}
+        {% if form.assistant3.errors %}
+            <div class="field-error">{{ form.assistant3.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.assistant4.errors %}has-error{% endif %}">
+        <label for="{{ form.assistant4.id_for_label }}">
+            {% trans "Асистент 4:" %}
+        </label><br>
+        {{ form.assistant4 }}
+        {% if form.assistant4.errors %}
+            <div class="field-error">{{ form.assistant4.errors }}</div>
+        {% endif %}
+    </p>
+
+    <p class="{% if form.qa_manager.errors %}has-error{% endif %}">
+        <label for="{{ form.qa_manager.id_for_label }}">
+            {% trans "Менеджер КК:" %}
+            {% if form.qa_manager.field.required %}<span class="text-danger">*</span>{% endif %}
+        </label><br>
+        {{ form.qa_manager }}
+        {% if form.qa_manager.errors %}
+            <div class="field-error">{{ form.qa_manager.errors }}</div>
+        {% endif %}
+    </p>
 
     <br>
     {% if not read_only %}

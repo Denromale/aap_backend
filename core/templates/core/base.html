@@ -12,6 +12,22 @@
 
     <!-- favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'core/favicon.ico' %}">
+    <style>
+        .has-error input,
+        .has-error select,
+        .has-error textarea {
+            border-color: #dc3545 !important;
+            background-color: #f8d7da !important;
+        }
+    
+        .field-error {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 3px;
+        }
+    </style>
+    
+    </style>
 </head>
 <body class="app-body">
 
@@ -59,10 +75,12 @@
     <!-- ПРАВА ЧАСТИНА -->
     <div class="app-main">
         <header class="topbar">
-            <div class="topbar-left">
-                {% block page_title %}
-                    <h1 class="topbar-title">Automated Auditing Processes</h1>
-                {% endblock %}
+            <div class="topbar-title">
+                {% if request.organization %}
+                    {{ request.organization.name }}
+                {% else %}
+                    Automated Auditing Processes
+                {% endif %}
             </div>
             <div class="topbar-right">
                 {% if request.user.is_authenticated %}

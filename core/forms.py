@@ -1,3 +1,5 @@
+import re  # <- ДОБАВЬ ЭТУ СТРОКУ
+
 from django import forms
 from django.contrib.auth.models import User
 from .models import Client
@@ -129,10 +131,8 @@ class ClientForm(forms.ModelForm):
             "assistant3",
             "assistant4",
             "qa_manager",
-
-            "task_subject",          # ← НОВОЕ
-            "deadline", 
         ]
+
 
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
@@ -187,4 +187,109 @@ class ClientForm(forms.ModelForm):
             "assistant4": forms.Select(attrs={"class": "form-control"}),
 
             "qa_manager": forms.Select(attrs={"class": "form-control"}),
+
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
+        required_fields = [
+            "name",
+            "edrpou",
+
+            "address_country",
+            "address_city",
+            "address_street",
+            "address_building",  # будинок/корпус
+            "address_office",   # офіс
+            "kved",  
+            "address_zip",            # КВЕД
+
+            "requisites_number",
+            "requisites_date",
+            "requisites_amount",
+            "requisites_vat", 
+            
+
+            "planned_hours",
+
+            "supervision_body",
+            "legal_form",
+
+            "reporting_period",
+            "contract_deadline",
+
+            "engagement_subject",
+
+            "authorized_person_name",
+            "authorized_person_email",
+
+            "status",
+
+            "manager",
+            "qa_manager",
+
+        ]
+
+        for field_name in required_fields:
+         if field_name in self.fields:
+            field = self.fields[field_name]
+
+            # Django-логика: поле обязательное
+            field.required = True
+
+            # УБИРАЕМ HTML5 required, чтобы браузер не блокировал submit
+            field.widget.attrs.pop("required", None)
+
+            # Класс для возможной стилизации (он у нас сейчас "немой")
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = (css + " required-input").strip()
+
+
+    def clean_reporting_period(self):
+        """
+        Допустимые варианты:
+        - '2022'
+        - '1 квартал 2022'
+        - '2 квартал 2022'
+        - '3 квартал 2022'
+        """
+        value = self.cleaned_data.get("reporting_period", "")
+        value_stripped = (value or "").strip()
+
+        if not value_stripped:
+            return value
+
+        # год, например: 2022
+        pattern_year = r"^\d{4}$"
+
+        # квартал: "1 квартал 2022", "2й квартал 2022" и т.п.
+        pattern_quarter = r"^[1-3]\s*й?\s*квартал\s+\d{4}$"
+
+        if re.match(pattern_year, value_stripped) or re.match(pattern_quarter, value_stripped):
+            return value_stripped
+
+        raise forms.ValidationError(
+            "Допустимі формати: '2022' або '1 квартал 2022', '2 квартал 2022', '3 квартал 2022'."
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        audit_report_type = cleaned_data.get("audit_report_type")
+        audit_report_date = cleaned_data.get("audit_report_date")
+
+        if audit_report_type and not audit_report_date:
+            self.add_error(
+                "audit_report_date",
+                "Укажіть дату аудиторського звіту, оскільки обрано його вид.",
+            )
+
+        if audit_report_date and not audit_report_type:
+            self.add_error(
+                "audit_report_type",
+                "Укажіть вид аудиторського звіту, оскільки вказано дату.",
+            )
+
+        return cleaned_data

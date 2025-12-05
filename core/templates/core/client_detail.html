@@ -45,17 +45,17 @@
         </div>
     </section>
 
-    <!-- КВЕД та ПОІ -->
+    <!-- КВЕД та ПСІ -->
     <section class="client-section client-section--collapsed">
         <button type="button" class="client-section-header">
-            <span>{% trans "КВЕД та ПОІ" %}</span>
+            <span>{% trans "КВЕД та ПСІ" %}</span>
             <span class="client-section-chevron">▼</span>
         </button>
         <div class="client-section-body">
             <ul>
                 <li><strong>{% trans "КВЕД:" %}</strong> {{ client.kved }}</li>
                 <li>
-                    <strong>{% trans "ПОІ:" %}</strong>
+                    <strong>{% trans "ПСІ:" %}</strong>
                     {% if client.poi %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
                 </li>
             </ul>
@@ -86,15 +86,26 @@
         </button>
         <div class="client-section-body">
             <ul>
-                <li><strong>{% trans "Орган нагляду:" %}</strong> {{ client.supervision_body }}</li>
-                <li><strong>{% trans "Організаційно-правова форма:" %}</strong> {{ client.legal_form }}</li>
+                <li>
+                    <strong>{% trans "Орган нагляду:" %}</strong>
+                    {{ client.get_supervision_body_display }}
+                </li>
+                <li>
+                    <strong>{% trans "Організаційно-правова форма:" %}</strong>
+                    {{ client.get_legal_form_display }}
+                </li>
                 <li>
                     <strong>{% trans "Обов'язковий аудит (огляд):" %}</strong>
-                    {% if client.mandatory_audit %}{% trans "Так" %}{% else %}{% trans "Ні" %}{% endif %}
+                    {% if client.mandatory_audit %}
+                        {% trans "Так" %}
+                    {% else %}
+                        {% trans "Ні" %}
+                    {% endif %}
                 </li>
             </ul>
         </div>
     </section>
+
 
     <!-- Період та строк -->
     <section class="client-section client-section--collapsed">
@@ -118,7 +129,7 @@
         </button>
         <div class="client-section-body">
             <ul>
-                <li><strong>{% trans "Предмет завдання:" %}</strong> {{ client.engagement_subject }}</li>
+                <li><strong>{% trans "Предмет завдання:" %}</strong> {{ client.get_engagement_subject_display }}</li>
             </ul>
         </div>
     </section>
@@ -147,8 +158,8 @@
             <ul>
                 <li><strong>{% trans "№ аудиторського звіту:" %}</strong> {{ client.audit_report_number }}</li>
                 <li><strong>{% trans "Дата аудиторського звіту:" %}</strong> {{ client.audit_report_date }}</li>
-                <li><strong>{% trans "Вид аудиторського звіту:" %}</strong> {{ client.audit_report_type }}</li>
-                <li><strong>{% trans "Параграф аудиторського звіту:" %}</strong> {{ client.audit_report_paragraph }}</li>
+                <li><strong>{% trans "Вид аудиторського звіту:" %}</strong> {{ client.get_audit_report_type_display }}</li>
+                <li><strong>{% trans "Параграф аудиторського звіту:" %}</strong> {{ client.get_audit_report_paragraph_display }}</li>
                 <li><strong>{% trans "Дата повідомлення до органу нагляду:" %}</strong> {{ client.supervision_notice_date }}</li>
                 <li>
                     <strong>{% trans "Контрольні процедури в CW виконані:" %}</strong>
@@ -166,7 +177,7 @@
         </button>
         <div class="client-section-body">
             <ul>
-                <li><strong>{% trans "Статус:" %}</strong> {{ client.status }}</li>
+                <li><strong>{% trans "Статус:" %}</strong> {{ client.get_status_display }}</li>
                 <li><strong>{% trans "Створено:" %}</strong> {{ client.created_at }}</li>
             </ul>
         </div>

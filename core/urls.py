@@ -1,9 +1,12 @@
 from django.urls import path
+from django.contrib.auth import views as auth_views
 from . import views
 
 urlpatterns = [
     path('', views.home, name='home'),              # главная
     path('login/', views.login_view, name='login'), # логин
+    path('logout/', views.logout_view, name='logout'),
+
     path('dashboard/', views.dashboard, name='dashboard'),
 
     path("news/<int:pk>/", views.news_detail, name="news_detail"),
@@ -19,8 +22,16 @@ urlpatterns = [
     path('documents/', views.documents_view, name='documents'),
     path('documents/<int:doc_id>/update/', views.document_update_type, name='document_update_type'),
     path('documents/<int:pk>/delete/', views.document_delete, name='document_delete'),
-    path("set-active-client/", views.set_active_client, name="set_active_client"),
 
-    path('logout/', views.logout_view, name='logout'),
+    path("set-active-client/", views.set_active_client, name="set_active_client"),
+    path("password_reset/",auth_views.PasswordResetView.as_view(),name="password_reset",    ),
+    path(        "password_reset/done/",        auth_views.PasswordResetDoneView.as_view(),        name="password_reset_done",    ),
+    path(        "reset/<uidb64>/<token>/",        auth_views.PasswordResetConfirmView.as_view(),        name="password_reset_confirm",    ),
+    path(        "reset/done/",        auth_views.PasswordResetCompleteView.as_view(),        name="password_reset_complete",    ),
 ]
 
+# --------------------------------------------------------------------
+# 🔐 БЛОК ДЛЯ ВОССТАНОВЛЕНИЯ ПАРОЛЯ (Password Reset)
+# --------------------------------------------------------------------
+
+    
