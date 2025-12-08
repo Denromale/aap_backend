@@ -62,6 +62,15 @@
 
         <div class="sidebar-bottom">
             {% if request.user.is_authenticated %}
+                <nav class="sidebar-nav">
+                    <a href="{% url 'metrics' %}"
+                       class="sidebar-link{% if request.resolver_match.url_name == 'metrics' %} is-active{% endif %}">
+                        Метрики
+                    </a>
+                </nav>
+        
+                <hr class="sidebar-divider">
+        
                 <form action="{% url 'logout' %}" method="post">
                     {% csrf_token %}
                     <button class="sidebar-link sidebar-logout" type="submit">
@@ -70,6 +79,8 @@
                 </form>
             {% endif %}
         </div>
+        
+        
     </aside>
 
     <!-- ПРАВА ЧАСТИНА -->

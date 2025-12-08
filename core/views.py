@@ -3,23 +3,86 @@ from io import BytesIO
 import json
 import os
 
+from collections import defaultdict
+
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date 
 from django.views.decorators.http import require_POST
 from docx import Document
 
 from .forms import ClientForm
 from .models import Client, ClientDocument, News
+from .decorators import is_manager, manager_required
+
+
+# ---------- CONSTANTS / HELPERS ----------
+
+TEAM_ROLE_FIELDS = (
+    "manager",
+    "auditor",
+    "auditor2",
+    "auditor3",
+    "assistant",
+    "assistant2",
+    "assistant3",
+    "assistant4",
+    "qa_manager",
+)
+
+
+def build_team_q(user) -> Q:
+    """
+    Q-объект для фильтрации клиентов, где пользователь входит в команду.
+    """
+    q = Q()
+    for field in TEAM_ROLE_FIELDS:
+        q |= Q(**{field: user})
+    return q
+
+
+def user_in_client_team(user, client) -> bool:
+    """
+    Проверка, состоит ли пользователь в команде конкретного клиента.
+    """
+    for field in TEAM_ROLE_FIELDS:
+        if getattr(client, field) == user:
+            return True
+    return False
+
+
+def get_user_clients_qs(user, organization):
+    """
+    Базовый queryset клиентов, доступных пользователю в рамках организации.
+    - суперпользователь и менеджер видят всех клиентов организации
+    - обычный пользователь видит только проекты, где он в команде
+    """
+    base = Client.objects.filter(organization=organization)
+    if user.is_superuser or is_manager(user):
+        return base
+    return base.filter(build_team_q(user)).distinct()
+
+
+def get_active_client_from_session(request, clients_qs):
+    """
+    Возвращает клиента из active_client_id в сессии,
+    если он принадлежит доступному пользователю queryset'у.
+    """
+    active_client_id = request.session.get("active_client_id")
+    if not active_client_id:
+        return None
+    return clients_qs.filter(id=active_client_id).first()
 
 
 # ---------- NEWS ----------
+
 
 @login_required
 def news_detail(request, pk):
@@ -29,34 +92,17 @@ def news_detail(request, pk):
 
 # ---------- DASHBOARD ----------
 
+
 @login_required
 def dashboard(request):
     """
     Призначені проєкти:
-    - Адмін бачить усіх клієнтів своєї організації
+    - Суперадмін і користувач у групі manager бачать усіх клієнтів своєї організації
     - Звичайний користувач – тільки там, де він у ролі
     + Фільтри по назві, періоду, предмету завдання та статусу
     """
-
-    # базовый queryset с учётом прав доступу и organization
-    if request.user.is_superuser:
-        base_qs = Client.objects.filter(organization=request.organization)
-    else:
-        base_qs = (
-            Client.objects.filter(
-                Q(manager=request.user)
-                | Q(auditor=request.user)
-                | Q(auditor2=request.user)
-                | Q(auditor3=request.user)
-                | Q(assistant=request.user)
-                | Q(assistant2=request.user)
-                | Q(assistant3=request.user)
-                | Q(assistant4=request.user)
-                | Q(qa_manager=request.user),
-                organization=request.organization,
-            )
-            .distinct()
-        )
+    user = request.user
+    base_qs = get_user_clients_qs(user, request.organization)
 
     # ---------- фильтры из GET ----------
     q = (request.GET.get("q") or "").strip()
@@ -121,6 +167,7 @@ def dashboard(request):
         "status_choices": status_choices,
         "subject_choices": subject_choices,
         "active_client_id": active_client_id_str,
+        "is_manager": is_manager(user),
     }
 
     return render(request, "core/dashboard.html", context)
@@ -128,34 +175,32 @@ def dashboard(request):
 
 # ---------- DOCX УТИЛИТА ----------
 
+
 def fill_docx(template_path: str, context: dict) -> BytesIO:
     """
     Открывает docx, подставляет значения по меткам и возвращает файл в памяти.
     """
     doc = Document(template_path)
 
-    # --- Абзацы ---
-    for p in doc.paragraphs:
-        original_text = p.text
+    def replace_in_paragraph(paragraph):
+        original_text = paragraph.text
         for key, value in context.items():
             if key in original_text:
-                for run in p.runs:
+                for run in paragraph.runs:
                     run.text = run.text.replace(key, value)
-                if key in p.text and original_text.strip() == key:
-                    p.text = original_text.replace(key, value)
+                if key in paragraph.text and original_text.strip() == key:
+                    paragraph.text = original_text.replace(key, value)
+
+    # --- Абзацы ---
+    for p in doc.paragraphs:
+        replace_in_paragraph(p)
 
     # --- Таблицы ---
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
-                    original_text = p.text
-                    for key, value in context.items():
-                        if key in original_text:
-                            for run in p.runs:
-                                run.text = run.text.replace(key, value)
-                            if key in p.text and original_text.strip() == key:
-                                p.text = original_text.replace(key, value)
+                    replace_in_paragraph(p)
 
     buf = BytesIO()
     doc.save(buf)
@@ -164,6 +209,7 @@ def fill_docx(template_path: str, context: dict) -> BytesIO:
 
 
 # ---------- ACTIVE CLIENT В СЕССИИ ----------
+
 
 @login_required
 @require_POST
@@ -192,6 +238,7 @@ def set_active_client(request):
 
 # ---------- AUTH ----------
 
+
 def login_view(request):
     """
     Простой логин через username/password + галочка 'Запомнить'.
@@ -213,7 +260,6 @@ def login_view(request):
             # если галочка НЕ стоит — сессия до закрытия браузера
             if not remember_me:
                 request.session.set_expiry(0)
-            # если галочка стоит — ничего не делаем, работает стандартный срок
 
             return redirect("home")
         else:
@@ -229,6 +275,7 @@ def logout_view(request):
 
 # ---------- HOME ----------
 
+
 @login_required
 def home(request):
     """
@@ -241,27 +288,12 @@ def home(request):
 
 # ---------- TEAM / БЮДЖЕТ ----------
 
+
 @login_required
 def client_team(request, pk):
-    client = get_object_or_404(
-        Client,
-        pk=pk,
-        organization=request.organization,
-    )
-
-    if not request.user.is_superuser:
-        if not (
-            client.manager == request.user
-            or client.auditor == request.user
-            or client.auditor2 == request.user
-            or client.auditor3 == request.user
-            or client.assistant == request.user
-            or client.assistant2 == request.user
-            or client.assistant3 == request.user
-            or client.assistant4 == request.user
-            or client.qa_manager == request.user
-        ):
-            return redirect("dashboard")
+    # клиент берётся только из списка доступных пользователю проектов
+    clients_qs = get_user_clients_qs(request.user, request.organization)
+    client = get_object_or_404(clients_qs, pk=pk)
 
     total_hours = client.planned_hours or Decimal("0")
     total_budget = client.requisites_amount or Decimal("0")
@@ -269,7 +301,7 @@ def client_team(request, pk):
     def quant(x: Decimal | None):
         if x is None:
             return None
-        return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return x.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     rows = []
 
@@ -284,7 +316,7 @@ def client_team(request, pk):
         }
     )
 
-    # Аудиторы (0.47)
+    # Аудитори (0.47)
     auditors = [
         ("Аудитор 1", client.auditor),
         ("Аудитор 2", client.auditor2),
@@ -313,7 +345,7 @@ def client_team(request, pk):
             }
         )
 
-    # Ассистенты (0.40)
+    # Асистенти (0.40)
     assistants = [
         ("Асистент 1", client.assistant),
         ("Асистент 2", client.assistant2),
@@ -365,6 +397,7 @@ def client_team(request, pk):
 
 # ---------- CRUD КЛИЕНТА ----------
 
+
 @login_required
 def client_create(request):
     # клиентов создаёт только админ
@@ -379,7 +412,6 @@ def client_create(request):
             client.save()
             return redirect("dashboard")
         else:
-            # >>> ДОБАВЛЕНО: вывод ошибок в консоль
             print("\n=== FORM ERRORS (client_create) ===")
             print(form.errors.as_json())
             print("=== END FORM ERRORS ===\n")
@@ -389,53 +421,21 @@ def client_create(request):
     return render(request, "core/client_form.html", {"form": form})
 
 
-
 @login_required
 def client_detail(request, pk):
-    client = get_object_or_404(
-        Client,
-        pk=pk,
-        organization=request.organization,
-    )
-
-    if not request.user.is_superuser:
-        if not (
-            client.manager == request.user
-            or client.auditor == request.user
-            or client.auditor2 == request.user
-            or client.auditor3 == request.user
-            or client.assistant == request.user
-            or client.assistant2 == request.user
-            or client.assistant3 == request.user
-            or client.assistant4 == request.user
-            or client.qa_manager == request.user
-        ):
-            return redirect("dashboard")
+    # клиент берётся только из списка доступных пользователю проектов
+    clients_qs = get_user_clients_qs(request.user, request.organization)
+    client = get_object_or_404(clients_qs, pk=pk)
 
     return render(request, "core/client_detail.html", {"client": client})
 
 
+
 @login_required
 def client_edit(request, pk):
-    client = get_object_or_404(
-        Client,
-        pk=pk,
-        organization=request.organization,
-    )
-
-    if not request.user.is_superuser:
-        if not (
-            client.manager == request.user
-            or client.auditor == request.user
-            or client.auditor2 == request.user
-            or client.auditor3 == request.user
-            or client.assistant == request.user
-            or client.assistant2 == request.user
-            or client.assistant3 == request.user
-            or client.assistant4 == request.user
-            or client.qa_manager == request.user
-        ):
-            return redirect("dashboard")
+    # клиент берётся только из списка доступных пользователю проектов
+    clients_qs = get_user_clients_qs(request.user, request.organization)
+    client = get_object_or_404(clients_qs, pk=pk)
 
     if request.method == "POST":
         form = ClientForm(request.POST, instance=client)
@@ -456,16 +456,22 @@ def client_edit(request, pk):
     )
 
 
+
 @login_required
 def client_delete(request, pk):
+    """
+    Удаление клиента:
+    - менеджеру запрещено удалять клиентов
+    - объект ограничен текущей организацией
+    """
+    if is_manager(request.user):
+        return HttpResponseForbidden("Менеджеру заборонено видаляти клієнтів.")
+
     client = get_object_or_404(
         Client,
         pk=pk,
         organization=request.organization,
     )
-
-    if not request.user.is_superuser:
-        return redirect("dashboard")
 
     if request.method == "POST":
         client.delete()
@@ -476,52 +482,33 @@ def client_delete(request, pk):
 
 # ---------- ЗАПИТИ / ГЕНЕРАЦИЯ DOCX ----------
 
+
 @login_required
 def requests_view(request):
     """
     Страница «Запити».
     Клиент берётся из active_client_id в сессии.
     """
+    user = request.user
+    clients_qs = get_user_clients_qs(user, request.organization)
 
-    if request.user.is_superuser:
-        clients_qs = Client.objects.filter(organization=request.organization)
-    else:
-        clients_qs = (
-            Client.objects.filter(
-                Q(manager=request.user)
-                | Q(auditor=request.user)
-                | Q(auditor2=request.user)
-                | Q(auditor3=request.user)
-                | Q(assistant=request.user)
-                | Q(assistant2=request.user)
-                | Q(assistant3=request.user)
-                | Q(assistant4=request.user)
-                | Q(qa_manager=request.user),
-                organization=request.organization,
-            )
-            .distinct()
-        )
-
-    active_client_id = request.session.get("active_client_id")
-    selected_client = (
-        clients_qs.filter(id=active_client_id).first() if active_client_id else None
-    )
+    active_client = get_active_client_from_session(request, clients_qs)
 
     if request.method == "GET":
         return render(
             request,
             "core/requests.html",
-            {"selected_client": selected_client},
+            {"selected_client": active_client},
         )
 
-    if not selected_client:
+    if not active_client:
         return redirect("requests")
 
     doc_type = request.POST.get("doc_type")
     if doc_type not in {"remembrance_team", "team_independence", "order"}:
         return redirect("requests")
 
-    client = selected_client
+    client = active_client
 
     if doc_type == "remembrance_team":
         template_name = "remembrance_team.docx"
@@ -578,30 +565,13 @@ def requests_view(request):
 
 # ---------- ДОКУМЕНТЫ ----------
 
+
 @login_required
 def documents_view(request):
+    user = request.user
+
     # 1. Клиенты, доступные пользователю
-    if request.user.is_superuser:
-        clients = Client.objects.filter(
-            organization=request.organization
-        ).order_by("name")
-    else:
-        clients = (
-            Client.objects.filter(
-                Q(manager=request.user)
-                | Q(auditor=request.user)
-                | Q(auditor2=request.user)
-                | Q(auditor3=request.user)
-                | Q(assistant=request.user)
-                | Q(assistant2=request.user)
-                | Q(assistant3=request.user)
-                | Q(assistant4=request.user)
-                | Q(qa_manager=request.user),
-                organization=request.organization,
-            )
-            .distinct()
-            .order_by("name")
-        )
+    clients = get_user_clients_qs(user, request.organization).order_by("name")
 
     if not clients.exists():
         return render(
@@ -616,29 +586,24 @@ def documents_view(request):
             },
         )
 
-    clients_list = []
-    for c in clients:
-        clients_list.append(
-            {
-                "id": c.id,
-                "name": c.name or "",
-                "reporting_period": c.reporting_period or "",
-                "requisites_number": c.requisites_number or "",
-                "engagement_subject": c.engagement_subject or "",
-                "engagement_subject_display": c.get_engagement_subject_display()
-                if c.engagement_subject
-                else "",
-            }
-        )
+    # список для фронта (select + js)
+    clients_list = [
+        {
+            "id": c.id,
+            "name": c.name or "",
+            "reporting_period": c.reporting_period or "",
+            "requisites_number": c.requisites_number or "",
+            "engagement_subject": c.engagement_subject or "",
+            "engagement_subject_display": c.get_engagement_subject_display()
+            if c.engagement_subject
+            else "",
+        }
+        for c in clients
+    ]
     clients_json = json.dumps(clients_list, ensure_ascii=False)
 
-    client_id = request.GET.get("client_id")
-    if not client_id:
-        client_id = request.session.get("active_client_id")
-
-    selected_client = None
-    if client_id:
-        selected_client = clients.filter(id=client_id).first()
+    client_id = request.GET.get("client_id") or request.session.get("active_client_id")
+    selected_client = clients.filter(id=client_id).first() if client_id else None
 
     # загрузка файла
     if request.method == "POST" and request.POST.get("action") == "upload":
@@ -658,8 +623,7 @@ def documents_view(request):
         docs_url = reverse("documents")
         if selected_client:
             return redirect(f"{docs_url}?client_id={selected_client.id}")
-        else:
-            return redirect(docs_url)
+        return redirect(docs_url)
 
     if selected_client:
         documents = (
@@ -698,26 +662,16 @@ def document_update_type(request, doc_id):
 
     client = doc.client
 
-    if not request.user.is_superuser:
-        if not (
-            client.manager == request.user
-            or client.auditor == request.user
-            or client.auditor2 == request.user
-            or client.auditor3 == request.user
-            or client.assistant == request.user
-            or client.assistant2 == request.user
-            or client.assistant3 == request.user
-            or client.assistant4 == request.user
-            or client.qa_manager == request.user
-        ):
-            return redirect("documents")
+    if not request.user.is_superuser and not user_in_client_team(request.user, client):
+        return redirect("documents")
 
     if request.method == "POST":
         doc.doc_type = request.POST.get("doc_type") or ""
         doc.custom_label = request.POST.get("custom_label") or ""
         doc.save()
 
-    return redirect(f"/documents/?client_id={client.id}")
+    documents_url = reverse("documents")
+    return redirect(f"{documents_url}?client_id={client.id}")
 
 
 @login_required
@@ -745,3 +699,167 @@ def document_delete(request, pk):
 
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client_id}")
+
+
+
+
+
+@login_required
+def metrics_view(request):
+    # доступ только менеджерам
+    if not is_manager(request.user):
+        return render(
+            request,
+            "core/access_denied.html",
+            {
+                "message": "У вас немає прав для перегляду цієї сторінки."
+            },
+            status=403,
+        )
+
+    org = request.organization
+
+    # --- чтение диапазона дат из GET ---
+    date_from_raw = (request.GET.get("date_from") or "").strip()
+    date_to_raw = (request.GET.get("date_to") or "").strip()
+    date_from = parse_date(date_from_raw) if date_from_raw else None
+    date_to = parse_date(date_to_raw) if date_to_raw else None
+
+    # --- базовый queryset по організації ---
+    clients_qs = Client.objects.filter(organization=org).select_related(
+        "manager",
+        "auditor",
+        "auditor2",
+        "auditor3",
+        "assistant",
+        "assistant2",
+        "assistant3",
+        "assistant4",
+        "qa_manager",
+    )
+
+    # --- фільтр по діапазону дат (contract_deadline) ---
+    if date_from:
+        clients_qs = clients_qs.filter(contract_deadline__gte=date_from)
+    if date_to:
+        clients_qs = clients_qs.filter(contract_deadline__lte=date_to)
+
+    # карточки вверху (уже по відфільтрованих проєктах)
+    total_clients = clients_qs.count()
+    active_projects = clients_qs.filter(status="active").count()
+    overdue_projects = clients_qs.filter(
+        contract_deadline__lt=timezone.now().date()
+    ).count()
+
+    # ---- АГРЕГАЦІЯ ПО КОМАНДІ ----
+
+    def quant(x: Decimal) -> Decimal:
+        return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    stats: dict[int, dict] = {}
+
+    def get_stat(user):
+        if user.id not in stats:
+            stats[user.id] = {
+                "user": user,
+                "projects": set(),
+                "poi_projects": set(),
+                "contract_sum": Decimal("0"),
+                "hours_sum": Decimal("0"),
+                "budget_share_sum": Decimal("0"),
+            }
+        return stats[user.id]
+
+    for client in clients_qs:
+        total_hours = client.planned_hours or Decimal("0")
+        total_budget = client.requisites_amount or Decimal("0")
+        is_poi = bool(client.poi)
+
+        def add_role(user, coeff: Decimal):
+            if not user or coeff == 0:
+                return
+
+            st = get_stat(user)
+
+            # разовый учёт проєкту для користувача
+            if client.id not in st["projects"]:
+                st["projects"].add(client.id)
+                st["contract_sum"] += total_budget
+            if is_poi:
+                st["poi_projects"].add(client.id)
+
+            # вклад по годинам і бюджету
+            st["hours_sum"] += total_hours * coeff
+            st["budget_share_sum"] += total_budget * coeff
+
+        manager_coeff = Decimal("0.10")
+        auditor_total_coeff = Decimal("0.47")
+        assistant_total_coeff = Decimal("0.40")
+        qa_coeff = Decimal("0.03")
+
+        add_role(client.manager, manager_coeff)
+
+        auditors = [client.auditor, client.auditor2, client.auditor3]
+        auditors_used = [u for u in auditors if u is not None]
+        per_auditor_coeff = (
+            auditor_total_coeff / len(auditors_used) if auditors_used else Decimal("0")
+        )
+        for u in auditors_used:
+            add_role(u, per_auditor_coeff)
+
+        assistants = [
+            client.assistant,
+            client.assistant2,
+            client.assistant3,
+            client.assistant4,
+        ]
+        assistants_used = [u for u in assistants if u is not None]
+        per_assistant_coeff = (
+            assistant_total_coeff / len(assistants_used) if assistants_used else Decimal("0")
+        )
+        for u in assistants_used:
+            add_role(u, per_assistant_coeff)
+
+        add_role(client.qa_manager, qa_coeff)
+
+    # ---- ПІДГОТОВКА ДАНИХ ДЛЯ ТАБЛИЦІ ----
+
+    team_stats = []
+    for st in stats.values():
+        projects_count = len(st["projects"])
+        poi_count = len(st["poi_projects"])
+
+        team_stats.append({
+            "user": st["user"],
+            "projects_count": projects_count,
+            "poi_count": poi_count,
+            "contract_sum": quant(st["contract_sum"]),
+            "hours_sum": quant(st["hours_sum"]),
+            "budget_share_sum": quant(st["budget_share_sum"]),
+        })
+
+    # ---- СОРТУВАННЯ ----
+
+    sort_param = request.GET.get("sort", "projects")
+    field_map = {
+        "projects": "projects_count",
+        "poi": "poi_count",
+        "contract": "contract_sum",
+        "hours": "hours_sum",
+        "budget": "budget_share_sum",
+    }
+    sort_field = field_map.get(sort_param, "projects_count")
+
+    team_stats.sort(key=lambda item: item[sort_field], reverse=True)
+
+    context = {
+        "total_clients": total_clients,
+        "active_projects": active_projects,
+        "overdue_projects": overdue_projects,
+        "team_stats": team_stats,
+        "current_sort": sort_param,
+        "date_from": date_from_raw,
+        "date_to": date_to_raw,
+        "is_manager": True,
+    }
+    return render(request, "core/metrics.html", context)

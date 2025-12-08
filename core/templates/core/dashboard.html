@@ -118,9 +118,15 @@
                             <td>
                                 <a href="{% url 'client_detail' client.pk %}">{% trans "Дані" %}</a> |
                                 <a href="{% url 'client_team' client.pk %}">{% trans "Команда" %}</a>
+
+                                {# Менеджер ИЛИ суперюзер могут редактировать #}
+                                {% if user.is_superuser or is_manager %}
+                                   | <a href="{% url 'client_edit' client.pk %}">{% trans "Змінити" %}</a>
+                                {% endif %}
+
+                                {# Удалять может только суперюзер #}
                                 {% if user.is_superuser %}
-                                    | <a href="{% url 'client_edit' client.pk %}">{% trans "Змінити" %}</a>
-                                    | <a href="{% url 'client_delete' client.pk %}">{% trans "Видалити" %}</a>
+                                   | <a href="{% url 'client_delete' client.pk %}">{% trans "Видалити" %}</a>
                                 {% endif %}
                             </td>
                         </tr>

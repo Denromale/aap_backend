@@ -1,16 +1,14 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 
-class Organization(models.Model):
-    name = models.CharField("Назва організації", max_length=255, unique=True)
-    # В будущем сюда можно добавить:
-    # logo = models.ImageField(upload_to="org_logos/", null=True, blank=True)
-    # domain = models.CharField(max_length=255, null=True, blank=True)
-    # settings_json = models.JSONField(null=True, blank=True)
+# =================== ОРГАНІЗАЦІЯ ===================
 
-    def __str__(self):
+class Organization(models.Model):
+    name = models.CharField(_("Назва організації"), max_length=255, unique=True)
+
+    def __str__(self) -> str:
         return self.name
 
 
@@ -109,7 +107,7 @@ REPORT_PARAGRAPH_CHOICES = [
 ]
 
 
-# =================== МОДЕЛЬ CLIENT ===================
+# =================== CLIENT ===================
 
 class Client(models.Model):
     organization = models.ForeignKey(
@@ -207,7 +205,7 @@ class Client(models.Model):
 
     # Команда
     manager = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Менеджер"),
         on_delete=models.SET_NULL,
         null=True,
@@ -215,7 +213,7 @@ class Client(models.Model):
         related_name="clients_as_manager",
     )
     auditor = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Аудитор 1"),
         on_delete=models.SET_NULL,
         null=True,
@@ -223,7 +221,7 @@ class Client(models.Model):
         related_name="clients_as_auditor1",
     )
     auditor2 = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Аудитор 2"),
         on_delete=models.SET_NULL,
         null=True,
@@ -231,7 +229,7 @@ class Client(models.Model):
         related_name="clients_as_auditor2",
     )
     auditor3 = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Аудитор 3"),
         on_delete=models.SET_NULL,
         null=True,
@@ -240,7 +238,7 @@ class Client(models.Model):
     )
 
     assistant = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Асистент 1"),
         on_delete=models.SET_NULL,
         null=True,
@@ -248,7 +246,7 @@ class Client(models.Model):
         related_name="clients_as_assistant1",
     )
     assistant2 = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Асистент 2"),
         on_delete=models.SET_NULL,
         null=True,
@@ -256,7 +254,7 @@ class Client(models.Model):
         related_name="clients_as_assistant2",
     )
     assistant3 = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Асистент 3"),
         on_delete=models.SET_NULL,
         null=True,
@@ -264,7 +262,7 @@ class Client(models.Model):
         related_name="clients_as_assistant3",
     )
     assistant4 = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Асистент 4"),
         on_delete=models.SET_NULL,
         null=True,
@@ -273,7 +271,7 @@ class Client(models.Model):
     )
 
     qa_manager = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Менеджер КК"),
         on_delete=models.SET_NULL,
         null=True,
@@ -281,56 +279,48 @@ class Client(models.Model):
         related_name="clients_as_qa_manager",
     )
 
-    # строки с username для импорта
-    manager_username = models.CharField("Менеджер (username)", max_length=150, blank=True)
-    auditor_username = models.CharField("Аудитор 1 (username)", max_length=150, blank=True)
-    auditor2_username = models.CharField("Аудитор 2 (username)", max_length=150, blank=True)
-    auditor3_username = models.CharField("Аудитор 3 (username)", max_length=150, blank=True)
-    assistant_username = models.CharField("Ассистент 1 (username)", max_length=150, blank=True)
-    assistant2_username = models.CharField("Ассистент 2 (username)", max_length=150, blank=True)
-    assistant3_username = models.CharField("Ассистент 3 (username)", max_length=150, blank=True)
-    assistant4_username = models.CharField("Ассистент 4 (username)", max_length=150, blank=True)
-    qa_manager_username = models.CharField("QA-менеджер (username)", max_length=150, blank=True)
+    # username для імпорту
+    manager_username = models.CharField(_("Менеджер (username)"), max_length=150, blank=True)
+    auditor_username = models.CharField(_("Аудитор 1 (username)"), max_length=150, blank=True)
+    auditor2_username = models.CharField(_("Аудитор 2 (username)"), max_length=150, blank=True)
+    auditor3_username = models.CharField(_("Аудитор 3 (username)"), max_length=150, blank=True)
+    assistant_username = models.CharField(_("Асистент 1 (username)"), max_length=150, blank=True)
+    assistant2_username = models.CharField(_("Асистент 2 (username)"), max_length=150, blank=True)
+    assistant3_username = models.CharField(_("Асистент 3 (username)"), max_length=150, blank=True)
+    assistant4_username = models.CharField(_("Асистент 4 (username)"), max_length=150, blank=True)
+    qa_manager_username = models.CharField(_("QA-менеджер (username)"), max_length=150, blank=True)
 
-    # Службова інформація
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Оновлено"), auto_now=True)
 
-    # Дополнительные поля (если реально нужны)
-    task_subject = models.CharField("Предмет завдання", max_length=255, blank=True)
-    deadline = models.DateField("Кінцевий строк виконання договору", null=True, blank=True)
+    task_subject = models.CharField(_("Предмет завдання (додатково)"), max_length=255, blank=True)
+    deadline = models.DateField(_("Кінцевий строк виконання договору (додатково)"), null=True, blank=True)
 
-    def display_label(self):
-        """
-        Текст, який показуємо у випадаючих списках:
-        Назва | Період | Дог. № | Предмет завдання
-        """
+    def display_label(self) -> str:
         parts = [self.name or ""]
 
         if self.reporting_period:
             parts.append(str(self.reporting_period))
-
         if self.requisites_number:
             parts.append(f"Дог. {self.requisites_number}")
-
         if self.engagement_subject:
             parts.append(self.get_engagement_subject_display())
 
         return " | ".join(parts)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.display_label()
 
 
-# =================== МОДЕЛЬ ДОКУМЕНТОВ ===================
+# =================== ДОКУМЕНТИ КЛІЄНТА ===================
 
 class ClientDocument(models.Model):
     DOC_TYPE_CHOICES = [
         ("", "---------"),
-        ("charter", "Установчий документ"),
-        ("request", "Запит / лист"),
-        ("agreement", "Договір"),
-        ("other", "Інше"),
+        ("charter", _("Установчий документ")),
+        ("request", _("Запит / лист")),
+        ("agreement", _("Договір")),
+        ("other", _("Інше")),
     ]
 
     organization = models.ForeignKey(
@@ -353,7 +343,7 @@ class ClientDocument(models.Model):
     doc_type = models.CharField(_("Тип документа"), max_length=50, choices=DOC_TYPE_CHOICES, blank=True, null=True)
     custom_label = models.CharField(_("Мітка / примітка"), max_length=255, blank=True, null=True)
     uploaded_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -361,20 +351,22 @@ class ClientDocument(models.Model):
     )
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.original_name or f"Документ #{self.pk}"
 
 
+# =================== НОВИНИ ===================
+
 class News(models.Model):
-    title = models.CharField("Заголовок", max_length=255)
-    body = models.TextField("Текст", blank=True)
-    image = models.ImageField("Зображення", upload_to="news/", blank=True, null=True)
-    link = models.URLField("Ссылка (опціонально)", blank=True)
-    is_published = models.BooleanField("Опубліковано", default=True)
-    created_at = models.DateTimeField("Створено", auto_now_add=True)
+    title = models.CharField(_("Заголовок"), max_length=255)
+    body = models.TextField(_("Текст"), blank=True)
+    image = models.ImageField(_("Зображення"), upload_to="news/", blank=True, null=True)
+    link = models.URLField(_("Посилання (опціонально)"), blank=True)
+    is_published = models.BooleanField(_("Опубліковано"), default=True)
+    created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title
