@@ -35,6 +35,9 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+# Флаг использования Cloudflare R2
+USE_R2 = os.getenv("USE_R2", "false").lower() == "true"
+
 # ================== ПРИЛОЖЕНИЯ ==================
 
 INSTALLED_APPS = [
@@ -45,8 +48,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "core",
-    "storages",
 ]
+
+if USE_R2:
+    INSTALLED_APPS.append("storages")
 
 # ================== MIDDLEWARE ==================
 
@@ -84,22 +89,22 @@ WSGI_APPLICATION = "aap_backend.wsgi.application"
 
 # ================== БАЗА ДАННЫХ ==================
 
-# В .env / на Render:
-# DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=require
-# (на Neon лучше брать URL прямо из панели)
-
 DATABASES = {
     "default": dj_database_url.parse(
         os.getenv(
             "DATABASE_URL",
-            # дефолт для локальной разработки, если .env не настроен
+            # дефолтный URL Neon, ОБЯЗАТЕЛЬНО с sslmode=require
             "postgres://neondb_owner:npg_Z7naRgVTU2Ac@"
             "ep-square-rice-agowaoze-pooler.c-2.eu-central-1.aws.neon.tech:5432/"
             "neondb?sslmode=require&channel_binding=require",
         ),
-        conn_max_age=600,
+        # не держим соединения долго, чтобы Neon не успевал закрывать idle-подключения
+        conn_max_age=0,
     )
 }
+
+# проверяем соединение перед использованием
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 # ================== ПАРОЛИ ==================
 
@@ -125,7 +130,7 @@ LANGUAGE_CODE = "uk"
 TIME_ZONE = "UTC"
 
 USE_I18N = True
-USE_L10N = True  # в новых версиях можно убрать, но не критично
+USE_L10N = True
 USE_TZ = True
 
 LANGUAGES = [
@@ -138,8 +143,6 @@ LOCALE_PATHS = [
     os.path.join(BASE_DIR, "locale"),
 ]
 
-
-
 # ================== СТАТИКА / МЕДИА ==================
 
 STATIC_URL = "/static/"
@@ -147,8 +150,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-USE_R2 = os.getenv("USE_R2", "false").lower() == "true"
 
 # Django 5: STORAGES
 STORAGES = {
@@ -171,7 +172,7 @@ if USE_R2:
     AWS_S3_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL")
 
     AWS_S3_REGION_NAME = "auto"
-    AWS_S3_ADDRESSING_STYLE = "path"
+    AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_S3_SIGNATURE_VERSION = "s3v4"
 
     AWS_DEFAULT_ACL = None
@@ -179,3 +180,5 @@ if USE_R2:
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
+
+# дальше можешь оставить свой DEFAULT_AUTO_FIELD, LOGIN_URL, EMAIL_* и т.п.
