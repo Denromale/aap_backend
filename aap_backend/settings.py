@@ -151,7 +151,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Django 5: STORAGES
+USE_R2 = os.getenv("USE_R2", "false").lower() == "true"
+
 STORAGES = {
     "default": {
         "BACKEND": (
@@ -166,12 +167,13 @@ STORAGES = {
 }
 
 if USE_R2:
-    AWS_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
-    AWS_S3_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL")
+    # читаем именно те переменные, которые у тебя в Render
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL")
+    AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "auto")
 
-    AWS_S3_REGION_NAME = "auto"
     AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_S3_SIGNATURE_VERSION = "s3v4"
 
@@ -180,5 +182,3 @@ if USE_R2:
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
-
-# дальше можешь оставить свой DEFAULT_AUTO_FIELD, LOGIN_URL, EMAIL_* и т.п.
