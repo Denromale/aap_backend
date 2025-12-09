@@ -296,6 +296,103 @@ class Client(models.Model):
     task_subject = models.CharField(_("Предмет завдання (додатково)"), max_length=255, blank=True)
     deadline = models.DateField(_("Кінцевий строк виконання договору (додатково)"), null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        """
+        Авто-узгодження команди по всіх «проєктах» з тим самим договором.
+
+        Логіка:
+        1) Якщо створюється новий клієнт з номером+датою договору і вже існує
+           запис з таким самим договором → команда КОПІЮЄТЬСЯ з першого запису.
+           Тобто введена в формі команда ігнорується, щоб всі проєкти за цим
+           договором мали одну й ту ж команду.
+        2) Якщо це перший запис за договором (ще немає інших клієнтів з тим
+           самим номером+датою) → зберігаємо як є і РОЗПОВСЮДЖУЄМО команду
+           по всіх майбутніх змінах цього запису.
+        3) Якщо змінено команду у наявного клієнта → команда оновлюється в
+           усіх записах з тим самим договором.
+        """
+
+        team_fields = [
+            "manager",
+            "auditor",
+            "auditor2",
+            "auditor3",
+            "assistant",
+            "assistant2",
+            "assistant3",
+            "assistant4",
+            "qa_manager",
+        ]
+
+        is_new = self.pk is None
+        propagate_team = False  # чи треба після збереження оновлювати інших
+
+        # ---------- НОВИЙ ЗАПИС ----------
+        if is_new:
+            # Якщо немає договору – нічого не розповсюджуємо та не копіюємо
+            if not self.requisites_number or not self.requisites_date:
+                propagate_team = False
+            else:
+                # Шукаємо "базовий" запис з таким самим договором
+                base_qs = Client.objects.filter(
+                    organization=self.organization,
+                    name=self.name,
+                    requisites_number=self.requisites_number,
+                    requisites_date=self.requisites_date,
+                )
+
+                base_client = base_qs.first()
+
+                if base_client:
+                    # Договір уже існує: КОПІЮЄМО команду з нього
+                    for field in team_fields:
+                        setattr(self, field, getattr(base_client, field))
+                    # Не розповсюджуємо, команда вже узгоджена з базовим
+                    propagate_team = False
+                else:
+                    # Це перший запис з таким договором → після save рознесемо
+                    propagate_team = True
+
+        # ---------- ІСНУЮЧИЙ ЗАПИС ----------
+        else:
+            # Перевіряємо, чи змінилась команда (щоб не робити зайвих оновлень)
+            try:
+                old = Client.objects.get(pk=self.pk)
+            except Client.DoesNotExist:
+                old = None
+
+            if old:
+                for field in team_fields:
+                    if getattr(old, field) != getattr(self, field):
+                        propagate_team = True
+                        break
+
+        # ---------- ЗБЕРІГАЄМО ПОТОЧНИЙ ЗАПИС ----------
+        super().save(*args, **kwargs)
+
+        # Якщо немає договору – нічого не розповсюджуємо
+        if not self.requisites_number or not self.requisites_date:
+            return
+
+        # Якщо не потрібно розповсюджувати – виходимо
+        if not propagate_team:
+            return
+
+        # ---------- ОНОВЛЮЄМО ІНШІ ЗАПИСИ З ТИМ САМИМ ДОГОВОРОМ ----------
+        qs = Client.objects.filter(
+            organization=self.organization,
+            name=self.name,
+            requisites_number=self.requisites_number,
+            requisites_date=self.requisites_date,
+        ).exclude(pk=self.pk)
+
+        if not qs.exists():
+            return
+
+        update_data = {field: getattr(self, field) for field in team_fields}
+        qs.update(**update_data)
+
+
     def display_label(self) -> str:
         parts = [self.name or ""]
 

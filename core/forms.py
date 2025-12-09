@@ -16,6 +16,27 @@ class ClientModelChoiceField(forms.ModelChoiceField):
 
 
 class ClientForm(forms.ModelForm):
+    # Явно задаём поля дат с форматом под HTML5 date
+    requisites_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"class": "form-control", "type": "date"},
+        ),
+        input_formats=["%Y-%m-%d"],
+        label="Дата договору/документа",
+    )
+
+    contract_deadline = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"class": "form-control", "type": "date"},
+        ),
+        input_formats=["%Y-%m-%d"],
+        label="Кінцевий строк виконання договору",
+    )
+
     # Поля команды
     manager = forms.ModelChoiceField(
         queryset=User.objects.all(),
@@ -133,7 +154,6 @@ class ClientForm(forms.ModelForm):
             "qa_manager",
         ]
 
-
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "edrpou": forms.TextInput(attrs={"class": "form-control"}),
@@ -149,7 +169,8 @@ class ClientForm(forms.ModelForm):
             "poi": forms.CheckboxInput(),
 
             "requisites_number": forms.TextInput(attrs={"class": "form-control"}),
-            "requisites_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            # requisites_date задаём выше как отдельное поле
+
             "requisites_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "requisites_vat": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
 
@@ -160,7 +181,7 @@ class ClientForm(forms.ModelForm):
             "mandatory_audit": forms.CheckboxInput(),
 
             "reporting_period": forms.TextInput(attrs={"class": "form-control"}),
-            "contract_deadline": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            # contract_deadline задаём выше как отдельное поле
 
             "engagement_subject": forms.Select(attrs={"class": "form-control"}),
 
@@ -187,7 +208,6 @@ class ClientForm(forms.ModelForm):
             "assistant4": forms.Select(attrs={"class": "form-control"}),
 
             "qa_manager": forms.Select(attrs={"class": "form-control"}),
-
         }
 
     def __init__(self, *args, **kwargs):
@@ -201,16 +221,15 @@ class ClientForm(forms.ModelForm):
             "address_country",
             "address_city",
             "address_street",
-            "address_building",  # будинок/корпус
-            "address_office",   # офіс
-            "kved",  
-            "address_zip",            # КВЕД
+            "address_building",
+            "address_office",
+            "kved",
+            "address_zip",
 
             "requisites_number",
             "requisites_date",
             "requisites_amount",
-            "requisites_vat", 
-            
+            "requisites_vat",
 
             "planned_hours",
 
@@ -229,23 +248,21 @@ class ClientForm(forms.ModelForm):
 
             "manager",
             "qa_manager",
-
         ]
 
         for field_name in required_fields:
-         if field_name in self.fields:
-            field = self.fields[field_name]
+            if field_name in self.fields:
+                field = self.fields[field_name]
 
-            # Django-логика: поле обязательное
-            field.required = True
+                # делаем поле обязательным на уровне Django
+                field.required = True
 
-            # УБИРАЕМ HTML5 required, чтобы браузер не блокировал submit
-            field.widget.attrs.pop("required", None)
+                # убираем HTML5 required, чтобы не мешал отправке
+                field.widget.attrs.pop("required", None)
 
-            # Класс для возможной стилизации (он у нас сейчас "немой")
-            css = field.widget.attrs.get("class", "")
-            field.widget.attrs["class"] = (css + " required-input").strip()
-
+                # добавляем CSS-класс для подсветки
+                css = field.widget.attrs.get("class", "")
+                field.widget.attrs["class"] = (css + " required-input").strip()
 
     def clean_reporting_period(self):
         """
@@ -261,10 +278,7 @@ class ClientForm(forms.ModelForm):
         if not value_stripped:
             return value
 
-        # год, например: 2022
         pattern_year = r"^\d{4}$"
-
-        # квартал: "1 квартал 2022", "2й квартал 2022" и т.п.
         pattern_quarter = r"^[1-3]\s*й?\s*квартал\s+\d{4}$"
 
         if re.match(pattern_year, value_stripped) or re.match(pattern_quarter, value_stripped):
