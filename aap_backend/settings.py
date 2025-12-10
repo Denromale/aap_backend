@@ -182,3 +182,13 @@ if USE_R2:
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
+# ================== АВТОРИЗАЦИЯ / РЕДИРЕКТЫ ==================
+
+# имя URL'а для страницы логина
+LOGIN_URL = "login"              # соответствует path("login/", ..., name="login")
+
+# куда отправлять пользователя ПОСЛЕ успешного логина
+LOGIN_REDIRECT_URL = "dashboard" # соответствует path("dashboard/", ..., name="dashboard")
+
+# куда отправлять ПОСЛЕ выхода из системы
+LOGOUT_REDIRECT_URL = "login"
