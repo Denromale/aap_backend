@@ -23,6 +23,8 @@ from .models import Client, ClientDocument, News
 from .decorators import is_manager, manager_required
 
 
+
+
 # ---------- CONSTANTS / HELPERS ----------
 
 TEAM_ROLE_FIELDS = (
@@ -405,11 +407,66 @@ def client_create(request):
         return redirect("dashboard")
 
     if request.method == "POST":
-        form = ClientForm(request.POST)
+        form = ClientForm(request.POST, request.FILES)
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = request.organization
-            client.save()
+            client.save()  # логика синхронизации команды уже срабатывает внутри модели/сигнала
+
+            # --- ищем "соседние" проекты с тем же договором ---
+            siblings = Client.objects.filter(
+                organization=request.organization,
+                name=client.name,
+                requisites_number=client.requisites_number,
+                requisites_date=client.requisites_date,
+            ).exclude(pk=client.pk)
+
+            # --- пробуем взять файл из формы ---
+            file = request.FILES.get("contract_scan")
+
+            if file:
+                # 1) есть новый файл → создаём документ для текущего клиента
+                base_doc = ClientDocument.objects.create(
+                    organization=request.organization,
+                    client=client,
+                    file=file,
+                    doc_type="agreement",
+                    original_name=file.name,
+                    custom_label="Скан-копія договору",
+                    uploaded_by=request.user,
+                )
+
+                # 2) размножаем этот договор на все проекты с тем же договором
+                for other in siblings:
+                    ClientDocument.objects.create(
+                        organization=request.organization,
+                        client=other,
+                        file=base_doc.file,
+                        doc_type=base_doc.doc_type,
+                        original_name=base_doc.original_name,
+                        custom_label=base_doc.custom_label,
+                        uploaded_by=request.user,
+                    )
+
+            else:
+                # файла НЕ загрузили → пробуем подтянуть ДОГОВОРЫ из уже существующих проектов
+                existing_docs = ClientDocument.objects.filter(
+                    organization=request.organization,
+                    client__in=siblings,
+                    doc_type="agreement",
+                ).distinct()
+
+                for doc in existing_docs:
+                    ClientDocument.objects.create(
+                        organization=request.organization,
+                        client=client,
+                        file=doc.file,
+                        doc_type=doc.doc_type,
+                        original_name=doc.original_name,
+                        custom_label=doc.custom_label,
+                        uploaded_by=doc.uploaded_by or request.user,
+                    )
+
             return redirect("dashboard")
         else:
             print("\n=== FORM ERRORS (client_create) ===")
@@ -431,18 +488,76 @@ def client_detail(request, pk):
 
 
 
+
+
 @login_required
 def client_edit(request, pk):
-    # клиент берётся только из списка доступных пользователю проектов
-    clients_qs = get_user_clients_qs(request.user, request.organization)
-    client = get_object_or_404(clients_qs, pk=pk)
+    # находим клиента только в текущей организации
+    client = get_object_or_404(Client, pk=pk, organization=request.organization)
+
+    # ПРАВА: редактировать могут суперюзер или участники команды
+    is_manager_group = request.user.groups.filter(name="Менеджер").exists()
+
+    is_in_team = any(
+        [
+            request.user == client.manager,
+            request.user == client.auditor,
+            request.user == client.auditor2,
+            request.user == client.auditor3,
+            request.user == client.assistant,
+            request.user == client.assistant2,
+            request.user == client.assistant3,
+            request.user == client.assistant4,
+            request.user == client.qa_manager,
+        ]
+    )
+
+    if not (request.user.is_superuser or is_manager_group or is_in_team):
+        return HttpResponseForbidden("У вас немає прав редагувати цього клієнта.")
 
     if request.method == "POST":
-        form = ClientForm(request.POST, instance=client)
+        # ВАЖНО: instance=client, чтобы не затирать данные
+        form = ClientForm(request.POST, request.FILES, instance=client)
         if form.is_valid():
-            form.save()
-            return redirect("dashboard")
+            client = form.save(commit=False)
+            client.organization = request.organization
+            client.save()
+
+            # ---- работа со сканом договора (как в create) ----
+            file = request.FILES.get("contract_scan")
+            if file:
+                base_doc = ClientDocument.objects.create(
+                    organization=request.organization,
+                    client=client,
+                    file=file,
+                    doc_type="agreement",
+                    original_name=file.name,
+                    custom_label="Скан-копія договору",
+                    uploaded_by=request.user,
+                )
+
+                # копируем скан на все проекты с тем же договором
+                siblings = Client.objects.filter(
+                    organization=request.organization,
+                    name=client.name,
+                    requisites_number=client.requisites_number,
+                    requisites_date=client.requisites_date,
+                ).exclude(pk=client.pk)
+
+                for other in siblings:
+                    ClientDocument.objects.create(
+                        organization=request.organization,
+                        client=other,
+                        file=base_doc.file,
+                        doc_type=base_doc.doc_type,
+                        original_name=base_doc.original_name,
+                        custom_label=base_doc.custom_label,
+                        uploaded_by=request.user,
+                    )
+
+            return redirect("client_detail", pk=client.pk)
     else:
+        # ВАЖНО: instance=client, чтобы в форме были старые значения
         form = ClientForm(instance=client)
 
     return render(
@@ -457,27 +572,22 @@ def client_edit(request, pk):
 
 
 
+
+
 @login_required
 def client_delete(request, pk):
-    """
-    Удаление клиента:
-    - менеджеру запрещено удалять клиентов
-    - объект ограничен текущей организацией
-    """
-    if is_manager(request.user):
-        return HttpResponseForbidden("Менеджеру заборонено видаляти клієнтів.")
+    client = get_object_or_404(Client, pk=pk, organization=request.organization)
 
-    client = get_object_or_404(
-        Client,
-        pk=pk,
-        organization=request.organization,
-    )
+    # только менеджер или суперюзер
+    is_manager = request.user.groups.filter(name="manager").exists()
+    if not (is_manager or request.user.is_superuser):
+        return HttpResponseForbidden("У вас немає прав видаляти клієнтів.")
 
-    if request.method == "POST":
-        client.delete()
-        return redirect("dashboard")
+    # если надо подтверждение – можно оставить GET-страницу.
+    # Сейчас просто удаляем и уходим на дашборд.
+    client.delete()
+    return redirect("dashboard")
 
-    return render(request, "core/client_confirm_delete.html", {"client": client})
 
 
 # ---------- ЗАПИТИ / ГЕНЕРАЦИЯ DOCX ----------

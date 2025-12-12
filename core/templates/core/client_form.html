@@ -26,7 +26,7 @@
     {% endif %}
 </h1>
 
-<form method="post" novalidate>
+<form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
 
     {% if form.non_field_errors %}
@@ -213,6 +213,14 @@
         {% endif %}
     </p>
 
+    <div class="mb-3">
+        <label for="{{ form.contract_scan.id_for_label }}">Скан-копія договору *</label>
+        {{ form.contract_scan }}
+        {% if form.contract_scan.errors %}
+            <div class="text-danger">{{ form.contract_scan.errors }}</div>
+        {% endif %}
+    </div>
+    
     <h2>{% trans "Нагляд, ОПФ, обов'язковий аудит" %}</h2>
 
     <p class="{% if form.supervision_body.errors %}has-error{% endif %}">

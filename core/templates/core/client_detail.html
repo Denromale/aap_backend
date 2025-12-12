@@ -63,20 +63,56 @@
     </section>
 
     <!-- Реквізити договору -->
+    
     <section class="client-section client-section--collapsed">
         <button type="button" class="client-section-header">
             <span>{% trans "Реквізити договору" %}</span>
-            <span class="client-section-chevron">▼</span>
+            <span class="client-section-chevron">⌄</span>
         </button>
+    
         <div class="client-section-body">
             <ul>
                 <li><strong>{% trans "№ договору/документа:" %}</strong> {{ client.requisites_number }}</li>
                 <li><strong>{% trans "Дата:" %}</strong> {{ client.requisites_date }}</li>
                 <li><strong>{% trans "Сума:" %}</strong> {{ client.requisites_amount }}</li>
                 <li><strong>{% trans "ПДВ:" %}</strong> {{ client.requisites_vat }}</li>
+    
+                {# показываем сканы договора только участникам команды (и суперюзеру) #}
+                {% if request.user.is_superuser or request.user == client.manager or request.user == client.auditor or request.user == client.auditor2 or request.user == client.auditor3 or request.user == client.assistant or request.user == client.assistant2 or request.user == client.assistant3 or request.user == client.assistant4 or request.user == client.qa_manager %}
+    
+                    <li>
+                        <strong>Скан-копії договорів:</strong>
+                        {% with docs=client.documents.all %}
+                            {% if docs %}
+                                {% for doc in docs %}
+                                    {% if doc.doc_type == "agreement" %}
+                                        {% if not forloop.first %}<br>{% endif %}
+                                        <span style="white-space: nowrap;">
+                                            <a href="{{ doc.file.url }}" target="_blank">
+                                                {{ doc.original_name|default:"Договір" }}
+                                            </a>
+                                            {% if doc.custom_label %}
+                                                – {{ doc.custom_label }}
+                                            {% endif %}
+                                        </span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span>Скан-копії договору ще не додані.</span>
+                            {% endif %}
+                        {% endwith %}
+                    </li>
+    
+                {% endif %}
             </ul>
+    
         </div>
     </section>
+    
+    
+    
+    
+
 
     <!-- Нагляд, ОПФ, обов'язковий аудит -->
     <section class="client-section client-section--collapsed">

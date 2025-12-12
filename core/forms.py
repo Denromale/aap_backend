@@ -1,8 +1,29 @@
-import re  # <- ДОБАВЬ ЭТУ СТРОКУ
+# core/forms.py
+
+import os
+import re
 
 from django import forms
-from django.contrib.auth.models import User
+from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+
 from .models import Client
+
+User = get_user_model()
+
+# Разрешённые расширения файлов договора
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
+
+# Максимальный размер одного файла (МБ)
+MAX_CONTRACT_FILE_MB = 20
+
+
+
+class MultiFileInput(forms.ClearableFileInput):
+    """
+    Виджет для множественной загрузки файлов.
+    """
+    allow_multiple_selected = True
 
 
 class ClientModelChoiceField(forms.ModelChoiceField):
@@ -16,7 +37,41 @@ class ClientModelChoiceField(forms.ModelChoiceField):
 
 
 class ClientForm(forms.ModelForm):
-    # Явно задаём поля дат с форматом под HTML5 date
+    contract_scan = forms.FileField(
+        required=False,
+        label="Скан-копія договору",
+        widget=forms.ClearableFileInput(),  # без multiple
+    )
+
+    def clean_contract_scan(self):
+        """
+        Проверяем тип и размер загружаемых файлов договора.
+        """
+        files = self.files.getlist("contract_scan")
+
+        # если файлов нет — просто вернуть текущее значение (валидация required делается отдельно)
+        if not files:
+            return self.cleaned_data.get("contract_scan")
+
+        for f in files:
+            # 1) проверка расширения
+            ext = os.path.splitext(f.name)[1].lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                raise forms.ValidationError(
+                    _("Дозволені тільки файли типу: %(exts)s."),
+                    params={"exts": ", ".join(sorted(ALLOWED_EXTENSIONS))},
+                )
+
+            # 2) проверка размера
+            if f.size > MAX_CONTRACT_FILE_MB * 1024 * 1024:
+                raise forms.ValidationError(
+                    _("Розмір кожного файлу не повинен перевищувати %(mb)s МБ."),
+                    params={"mb": MAX_CONTRACT_FILE_MB},
+                )
+
+        # мы сами список не используем, поэтому просто возвращаем стандартное значение
+        return self.cleaned_data.get("contract_scan")   
+
     requisites_date = forms.DateField(
         required=False,
         widget=forms.DateInput(
@@ -169,7 +224,6 @@ class ClientForm(forms.ModelForm):
             "poi": forms.CheckboxInput(),
 
             "requisites_number": forms.TextInput(attrs={"class": "form-control"}),
-            # requisites_date задаём выше как отдельное поле
 
             "requisites_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "requisites_vat": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -181,7 +235,6 @@ class ClientForm(forms.ModelForm):
             "mandatory_audit": forms.CheckboxInput(),
 
             "reporting_period": forms.TextInput(attrs={"class": "form-control"}),
-            # contract_deadline задаём выше как отдельное поле
 
             "engagement_subject": forms.Select(attrs={"class": "form-control"}),
 
@@ -209,11 +262,36 @@ class ClientForm(forms.ModelForm):
 
             "qa_manager": forms.Select(attrs={"class": "form-control"}),
         }
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
+    # --- вспомогательная функция: добавить legacy-значение в choices ---
+        def ensure_legacy_choice(field_name: str, value: str):
+            """
+            Если в БД лежит значение, которого нет в choices,
+            добавляем его как обычный option (value, value).
+
+            Нужно только для старых проектов, чтобы селект мог его показать.
+        """
+            if not value:
+                return
+
+            field = self.fields.get(field_name)
+            if not field:
+                return
+
+            choices = list(field.choices)
+
+        # если такое значение уже есть — ничего не делаем
+            if any(val == value for val, _ in choices):
+                return
+
+        # добавляем в начало списка, чтобы его можно было выбрать
+            choices.insert(0, (value, value))
+            field.choices = choices
+
+
+    # БАЗОВЫЙ список обязательных полей (как у тебя было)
         required_fields = [
             "name",
             "edrpou",
@@ -250,19 +328,28 @@ class ClientForm(forms.ModelForm):
             "qa_manager",
         ]
 
+    # если хочешь, чтобы скан был обязателен ТОЛЬКО при создании — раскомментируй:
+    # if not self.instance.pk:
+    #     required_fields.append("contract_scan")
+
         for field_name in required_fields:
             if field_name in self.fields:
                 field = self.fields[field_name]
-
-                # делаем поле обязательным на уровне Django
                 field.required = True
-
-                # убираем HTML5 required, чтобы не мешал отправке
                 field.widget.attrs.pop("required", None)
-
-                # добавляем CSS-класс для подсветки
                 css = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = (css + " required-input").strip()
+            # --- для существующего клиента подмешиваем старые значения, если нужно ---
+        instance = self.instance
+        if instance and instance.pk:
+            ensure_legacy_choice("supervision_body", instance.supervision_body)
+            ensure_legacy_choice("legal_form", instance.legal_form)
+            ensure_legacy_choice("engagement_subject", instance.engagement_subject)
+
+    
+    
+
+
 
     def clean_reporting_period(self):
         """
