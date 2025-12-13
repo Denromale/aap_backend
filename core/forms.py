@@ -193,6 +193,8 @@ class ClientForm(forms.ModelForm):
             "audit_report_paragraph",
             "supervision_notice_date",
             "cw_controls_done",
+            "audit_report_scan",
+            
 
             # Статус
             "status",

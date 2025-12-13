@@ -63,6 +63,12 @@
         <div class="sidebar-bottom">
             {% if request.user.is_authenticated %}
                 <nav class="sidebar-nav">
+                    {% if is_manager or request.user.is_superuser %}
+                        <a href="{% url 'projects_archive' %}"
+                            class="sidebar-link{% if request.resolver_match.url_name == 'projects_archive' %} is-active{% endif %}">
+                             Архів проєктів
+                        </a>
+                    {% endif %}
                     <a href="{% url 'metrics' %}"
                        class="sidebar-link{% if request.resolver_match.url_name == 'metrics' %} is-active{% endif %}">
                         Метрики

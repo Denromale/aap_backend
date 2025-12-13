@@ -28,12 +28,9 @@ urlpatterns = [
     path(        "reset/<uidb64>/<token>/",        auth_views.PasswordResetConfirmView.as_view(),        name="password_reset_confirm",    ),
     path(        "reset/done/",        auth_views.PasswordResetCompleteView.as_view(),        name="password_reset_complete",    ),
     path("metrics/", views.metrics_view, name="metrics"),
-    
+    path("clients/<int:pk>/complete/", views.client_complete, name="client_complete"),
+    path("projects/archive/", views.projects_archive, name="projects_archive"),
    
 ]
 
-# --------------------------------------------------------------------
-# 🔐 БЛОК ДЛЯ ВОССТАНОВЛЕНИЯ ПАРОЛЯ (Password Reset)
-# --------------------------------------------------------------------
 
-    

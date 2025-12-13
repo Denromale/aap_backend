@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-
+from django.utils import timezone
 
 # =================== ОРГАНІЗАЦІЯ ===================
 
@@ -11,7 +11,9 @@ class Organization(models.Model):
     def __str__(self) -> str:
         return self.name
 
-
+def client_audit_report_upload_to(instance, filename):
+    # отдельная папка для отчётов, чтобы не мешались с договорами/документами
+    return f"clients/{instance.id}/audit_report/{filename}"
 # =================== СПРАВОЧНИКИ ===================
 
 # Предмет завдання
@@ -193,30 +195,31 @@ class Client(models.Model):
     # Аудиторський звіт
     audit_report_number = models.CharField(_("№ аудиторського звіту"), max_length=100, blank=True, null=True)
     audit_report_date = models.DateField(_("Дата аудиторського звіту"), blank=True, null=True)
-    audit_report_type = models.CharField(
-        _("Вид аудиторського звіту"),
-        max_length=255,
-        choices=REPORT_TYPE_CHOICES,
-        blank=True,
-        null=True,
-    )
-    audit_report_paragraph = models.CharField(
-        _("Параграф аудиторського звіту"),
-        max_length=255,
-        choices=REPORT_PARAGRAPH_CHOICES,
-        blank=True,
-        null=True,
-    )
+    audit_report_type = models.CharField(_("Вид аудиторського звіту"),  max_length=255, choices=REPORT_TYPE_CHOICES, blank=True, null=True,)
+    audit_report_paragraph = models.CharField(_("Параграф аудиторського звіту"), max_length=255, choices=REPORT_PARAGRAPH_CHOICES, blank=True, null=True,)
 
     supervision_notice_date = models.DateField(_("Дата повідомлення органу нагляду"), blank=True, null=True)
 
     cw_controls_done = models.BooleanField(_("Контрольні процедури в CW виконані"), default=False)
+    audit_report_scan = models.FileField(_("Скан-копія аудиторського звіту"), upload_to=client_audit_report_upload_to, blank=True, null=True,)
 
     # Години
     planned_hours = models.DecimalField(_("Робочі години (план)"), max_digits=10, decimal_places=2, blank=True, null=True)
 
     # Статус
     status = models.CharField(_("Статус"), max_length=50, default="new")
+
+    is_completed = models.BooleanField(default=False, db_index=True, verbose_name=_("Проєкт завершено"))
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Дата завершення"))
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="completed_clients",
+        verbose_name=_("Хто завершив"),
+    )
+
 
     # Команда
     manager = models.ForeignKey(
@@ -304,6 +307,17 @@ class Client(models.Model):
     assistant3_username = models.CharField(_("Асистент 3 (username)"), max_length=150, blank=True)
     assistant4_username = models.CharField(_("Асистент 4 (username)"), max_length=150, blank=True)
     qa_manager_username = models.CharField(_("QA-менеджер (username)"), max_length=150, blank=True)
+    is_completed = models.BooleanField(_("Проект завершено"), default=False, db_index=True)
+    completed_at = models.DateTimeField(_("Дата завершення"), blank=True, null=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="completed_clients",
+        verbose_name=_("Хто завершив"),
+    )
+
 
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Оновлено"), auto_now=True)
@@ -482,3 +496,5 @@ class News(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+

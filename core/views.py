@@ -22,6 +22,8 @@ from .forms import ClientForm
 from .models import Client, ClientDocument, News
 from .decorators import is_manager, manager_required
 
+from django.contrib import messages
+
 
 
 
@@ -60,15 +62,26 @@ def user_in_client_team(user, client) -> bool:
     return False
 
 
-def get_user_clients_qs(user, organization):
+def get_user_clients_qs(user, organization, *, completed: bool | None = None):
     """
-    Базовый queryset клиентов, доступных пользователю в рамках организации.
-    - суперпользователь и менеджер видят всех клиентов организации
-    - обычный пользователь видит только проекты, где он в команде
+    Базовий queryset клієнтів, доступних користувачу в рамках організації.
+    - суперюзер і менеджер бачать всіх клієнтів організації
+    - звичайний користувач бачить тільки проєкти, де він у команді
+    completed:
+        None  -> всі
+        False -> тільки активні
+        True  -> тільки завершені
     """
     base = Client.objects.filter(organization=organization)
+
+    if completed is True:
+        base = base.filter(is_completed=True)
+    elif completed is False:
+        base = base.filter(is_completed=False)
+
     if user.is_superuser or is_manager(user):
         return base
+
     return base.filter(build_team_q(user)).distinct()
 
 
@@ -104,7 +117,8 @@ def dashboard(request):
     + Фільтри по назві, періоду, предмету завдання та статусу
     """
     user = request.user
-    base_qs = get_user_clients_qs(user, request.organization)
+    base_qs = get_user_clients_qs(user, request.organization, completed=False)
+
 
     # ---------- фильтры из GET ----------
     q = (request.GET.get("q") or "").strip()
@@ -113,6 +127,7 @@ def dashboard(request):
     subject = (request.GET.get("subject") or "").strip()
 
     clients = base_qs
+    clients = clients.filter(is_completed=False)
 
     if q:
         clients = clients.filter(name__icontains=q)
@@ -516,12 +531,15 @@ def client_edit(request, pk):
         return HttpResponseForbidden("У вас немає прав редагувати цього клієнта.")
 
     if request.method == "POST":
-        # ВАЖНО: instance=client, чтобы не затирать данные
         form = ClientForm(request.POST, request.FILES, instance=client)
         if form.is_valid():
+        # важно: form.save() сам корректно сохраняет FileField audit_report_scan,
+        # и НЕ трогает contract_scan (он не в Meta.fields)
             client = form.save(commit=False)
             client.organization = request.organization
             client.save()
+            # form.save_m2m() не нужен (у тебя нет m2m), но можно оставить как привычку:
+            # form.save_m2m()
 
             # ---- работа со сканом договора (как в create) ----
             file = request.FILES.get("contract_scan")
@@ -536,7 +554,6 @@ def client_edit(request, pk):
                     uploaded_by=request.user,
                 )
 
-                # копируем скан на все проекты с тем же договором
                 siblings = Client.objects.filter(
                     organization=request.organization,
                     name=client.name,
@@ -557,8 +574,8 @@ def client_edit(request, pk):
 
             return redirect("client_detail", pk=client.pk)
     else:
-        # ВАЖНО: instance=client, чтобы в форме были старые значения
-        form = ClientForm(instance=client)
+         form = ClientForm(instance=client)
+    can_complete = bool(client.audit_report_scan) and bool(client.cw_controls_done)
 
     return render(
         request,
@@ -567,10 +584,56 @@ def client_edit(request, pk):
             "form": form,
             "edit": True,
             "client": client,
+            "is_manager": is_manager(request.user),  # у тебя уже есть is_manager()
+            "can_complete": can_complete,
         },
     )
 
 
+    return render(
+    request,
+    "core/client_form.html",
+    {
+        "form": form,
+        "edit": True,
+        "client": client,
+        "is_manager": is_manager(request.user),
+    },
+)
+
+
+
+@login_required
+@require_POST
+def client_complete(request, pk):
+    client = get_object_or_404(Client, pk=pk, organization=request.organization)
+
+    # права
+    is_manager_group = request.user.groups.filter(name="Менеджер").exists()
+    is_in_team = any([
+        request.user == client.manager,
+        request.user == client.auditor,
+        request.user == client.auditor2,
+        request.user == client.auditor3,
+        request.user == client.assistant,
+        request.user == client.assistant2,
+        request.user == client.assistant3,
+        request.user == client.assistant4,
+        request.user == client.qa_manager,
+    ])
+    if not (request.user.is_superuser or is_manager_group or is_in_team):
+        return HttpResponseForbidden("Немає прав завершувати цей проєкт.")
+
+    client.is_completed = True
+    client.completed_at = timezone.now()
+    client.completed_by = request.user
+    client.save(update_fields=["is_completed", "completed_at", "completed_by"])
+
+    # убираем активный, если он был выбран
+    if str(request.session.get("active_client_id")) == str(client.pk):
+        request.session.pop("active_client_id", None)
+
+    return redirect("projects_archive")
 
 
 
@@ -973,3 +1036,118 @@ def metrics_view(request):
         "is_manager": True,
     }
     return render(request, "core/metrics.html", context)
+
+
+
+
+@login_required
+def projects_archive(request):
+    user = request.user
+
+    if not (user.is_superuser or is_manager(user)):
+        return HttpResponseForbidden("Доступ лише для менеджерів.")
+
+    base_qs = get_user_clients_qs(user, request.organization, completed=True)
+
+
+    # ---------- фильтры из GET ----------
+    q = (request.GET.get("q") or "").strip()
+    reporting_period = (request.GET.get("reporting_period") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    subject = (request.GET.get("subject") or "").strip()
+
+    clients = base_qs
+
+    if q:
+        clients = clients.filter(name__icontains=q)
+
+    if reporting_period:
+        clients = clients.filter(reporting_period=reporting_period)
+
+    if status:
+        clients = clients.filter(status=status)
+
+    if subject:
+        clients = clients.filter(engagement_subject=subject)
+
+    clients = clients.order_by("-completed_at", "-updated_at")
+
+    # ---------- значения для селектов ----------
+    reporting_period_choices = (
+        base_qs.values_list("reporting_period", flat=True)
+        .exclude(reporting_period__isnull=True)
+        .exclude(reporting_period__exact="")
+        .distinct()
+        .order_by("reporting_period")
+    )
+
+    status_choices = (
+        base_qs.values_list("status", flat=True)
+        .exclude(status__isnull=True)
+        .exclude(status__exact="")
+        .distinct()
+        .order_by("status")
+    )
+
+    subject_codes = (
+        base_qs.values_list("engagement_subject", flat=True)
+        .exclude(engagement_subject__isnull=True)
+        .exclude(engagement_subject__exact="")
+        .distinct()
+        .order_by("engagement_subject")
+    )
+
+    subject_choices = [
+        {
+            "value": code,
+            "label": Client(engagement_subject=code).get_engagement_subject_display(),
+        }
+        for code in subject_codes
+    ]
+
+    active_client_id = request.session.get("active_client_id")
+    active_client_id_str = str(active_client_id) if active_client_id is not None else ""
+
+    return render(
+        request,
+        "core/projects_archive.html",
+        {
+            "clients": clients,
+            "reporting_period_choices": reporting_period_choices,
+            "status_choices": status_choices,
+            "subject_choices": subject_choices,
+            "active_client_id": active_client_id_str,
+            "is_manager": is_manager(user),
+        },
+    )
+
+@login_required
+@require_POST
+def client_complete(request, pk):
+    client = get_object_or_404(Client, pk=pk, organization=request.organization)
+
+    # только менеджеры/супер
+    if not (request.user.is_superuser or is_manager(request.user)):
+        return HttpResponseForbidden("Доступ лише для менеджерів.")
+
+    # проверка условий завершения
+    if not client.audit_report_scan or not client.cw_controls_done:
+        messages.warning(
+            request,
+            "Щоб завершити проєкт, потрібно завантажити «Скан-копія аудиторського звіту» "
+            "та відмітити «Контрольні процедури в CW виконані»."
+        )
+        return redirect("client_edit", pk=client.pk)
+
+    # если уже завершён
+    if client.is_completed:
+        messages.info(request, "Проєкт уже завершений.")
+        return redirect("projects_archive")
+
+    client.is_completed = True
+    client.completed_at = timezone.now()
+    client.completed_by = request.user
+    client.save(update_fields=["is_completed", "completed_at", "completed_by"])
+
+    messages.success(request, "Проєкт завершено та перенесено в Архів.")
+    return redirect("projects_archive")

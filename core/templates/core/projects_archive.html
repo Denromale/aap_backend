@@ -1,0 +1,37 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}AAP – {% trans "Архів проєктів" %}{% endblock %}
+
+{% block content %}
+<div class="aap-wide">
+  <h2>{% trans "Архів проєктів" %}</h2>
+
+  {% if clients %}
+    <table>
+      <thead>
+        <tr>
+          <th>{% trans "Клієнт" %}</th>
+          <th>{% trans "Період" %}</th>
+          <th>{% trans "№ договору" %}</th>
+          <th>{% trans "Завершено" %}</th>
+          <th>{% trans "Дії" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+          <tr>
+            <td>{{ c.name }}</td>
+            <td>{{ c.reporting_period }}</td>
+            <td>{{ c.requisites_number }}</td>
+            <td>{{ c.completed_at|date:"d.m.Y H:i" }}</td>
+            <td><a href="{% url 'client_detail' c.pk %}">{% trans "Дані" %}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% trans "Архів порожній." %}</p>
+  {% endif %}
+</div>
+{% endblock %}
