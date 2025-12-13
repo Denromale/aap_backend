@@ -377,6 +377,26 @@
             <div class="field-error">{{ form.cw_controls_done.errors }}</div>
         {% endif %}
     </p>
+    
+    <div class="mb-3" style="margin-top:12px;">
+        <label for="{{ form.audit_report_scan.id_for_label }}">
+            {% trans "Скан-копія аудиторського звіту" %}
+        </label><br>
+        {{ form.audit_report_scan }}
+        {% if form.audit_report_scan.errors %}
+            <div class="field-error">{{ form.audit_report_scan.errors }}</div>
+        {% endif %}
+    
+        {% if client.audit_report_scan %}
+            <div class="hint" style="margin-top:6px;">
+                {% trans "Поточний файл:" %}
+                <a href="{{ client.audit_report_scan.url }}" target="_blank">{% trans "Відкрити" %}</a>
+            </div>
+        {% endif %}
+    </div>
+    
+
+    
 
     <h2>{% trans "Статус та команда" %}</h2>
 
@@ -483,12 +503,14 @@
         {% endif %}
     </p>
 
+
     <br>
     {% if not read_only %}
         <button type="submit" class="btn btn-primary">
             {% trans "Зберегти" %}
         </button>
     {% endif %}
+    
     <a href="{% url 'dashboard' %}" class="btn btn-secondary">
         {% if read_only %}
             {% trans "Назад до списку" %}
@@ -496,5 +518,18 @@
             {% trans "Скасувати" %}
         {% endif %}
     </a>
+    
+    {% if edit and user.is_superuser or edit and is_manager %}
+        <button type="submit"
+                class="btn btn-outline-primary"
+                formaction="{% url 'client_complete' client.pk %}"
+                formmethod="post"
+                onclick="return confirm('Ви впевнені, що хочете завершити проєкт? Після цього він буде в Архіві.');">
+            Завершити проєкт
+        </button>
+    {% endif %}
+
+    
+
 </form>
 {% endblock %}
