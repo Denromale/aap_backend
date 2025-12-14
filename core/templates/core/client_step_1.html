@@ -1,0 +1,122 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}
+КРОК 1 – Прийняття клієнта
+{% endblock %}
+
+{% block content %}
+
+<div class="aap-stepper" id="aapStepper">
+  {% for p in procedures %}
+    <div class="aap-step {{ p.status_class }} {% if forloop.first %}is-active{% endif %}"
+         data-code="{{ p.code }}" role="button" tabindex="0">
+      {{ p.short }}
+    </div>
+
+    {% if not forloop.last %}
+      <div class="aap-step-line"></div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<h2>КРОК 1 - ПРИЙНЯТТЯ КЛІЄНТА/ПРОДОВЖЕННЯ ВІДНОСИН З КЛІЄНТОМ (ПОПЕРЕДНІ ДІЇ)</h2>
+
+<p class="page-subtitle">
+  Мета: Прийняти обґрунтоване рішення, чи може АФ виконувати завдання, базуючись на оцінці ризиків клієнта, наявності ресурсів та дотриманні етичних вимог.
+</p>
+
+<p class="page-subtitle">
+  Документування: Партнер із завдання та фахівець КЯ підписує Прийняття завдання з визнанням того, що ризики залучення прийнятні для фірми, оцінка відповідності відповідає правилами етики/незалежності, доказами, отриманими щодо початкових залишків, та підписаним листом/угодою про завдання.
+</p>
+
+{% if selected_client %}
+  <div style="margin-bottom: 20px; padding: 12px 16px; background: #fff; border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(15,23,42,0.08);">
+    <p style="margin:0;">
+      <strong>Клієнт:</strong> {{ selected_client.name }}<br>
+      <strong>Звітний період:</strong> {{ selected_client.reporting_period }}<br>
+      <strong>№ договору:</strong> {{ selected_client.requisites_number }}
+    </p>
+  </div>
+{% else %}
+  <p>
+    Спочатку оберіть проєкт на сторінці
+    «<a href="{% url 'dashboard' %}">Призначені проєкти</a>».
+  </p>
+{% endif %}
+
+<div class="aap-step-panels" id="aapStepPanels">
+  {% for p in procedures %}
+    <div class="aap-step-panel {% if forloop.first %}is-open{% endif %}" id="panel-{{ p.code }}">
+      <h4 style="margin:0 0 8px;">{{ p.title }}</h4>
+      <p style="margin:0 0 12px; color:#6b7280;">{{ p.description }}</p>
+
+      <div class="card" style="padding:12px;">
+        <b>Очікуваний результат:</b> {{ p.expected }}
+      </div>
+
+      <hr style="margin:12px 0;">
+
+      <h4 style="margin:0 0 10px;">Файли для цього підкроку</h4>
+
+      <form method="post" enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="procedure_code" value="{{ p.code }}">
+        <input type="file" name="file" required>
+        <button type="submit" class="btn btn-primary">Завантажити файл</button>
+      </form>
+
+      {% if p.files %}
+        <ul style="margin-top:10px;">
+          {% for f in p.files %}
+          <li style="display:flex; gap:10px; align-items:center;">
+            <a href="{{ f.file.url }}" target="_blank">{{ f.file.name }}</a>
+          
+            <form method="post" action="{% url 'procedure_file_delete' f.id %}" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary"
+                      onclick="return confirm('Видалити файл?');">
+                Видалити
+              </button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<script>
+(function () {
+  const stepper = document.getElementById('aapStepper');
+  if (!stepper) return;
+
+  const steps = stepper.querySelectorAll('.aap-step');
+  const panels = document.querySelectorAll('.aap-step-panel');
+
+  function openPanel(code) {
+    steps.forEach(s => s.classList.remove('is-active'));
+    panels.forEach(p => p.classList.remove('is-open'));
+
+    const activeStep = stepper.querySelector(`.aap-step[data-code="${code}"]`);
+    const activePanel = document.getElementById(`panel-${code}`);
+
+    if (activeStep) activeStep.classList.add('is-active');
+    if (activePanel) activePanel.classList.add('is-open');
+  }
+
+  steps.forEach(s => {
+    s.addEventListener('click', () => openPanel(s.dataset.code));
+    s.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') openPanel(s.dataset.code);
+    });
+  });
+
+  const initial = "{{ open_code|default:'1_1' }}";
+  openPanel(initial);
+})();
+</script>
+
+{% endblock %}

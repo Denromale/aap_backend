@@ -23,9 +23,10 @@ from .models import Client, ClientDocument, News
 from .decorators import is_manager, manager_required
 
 from django.contrib import messages
+from .utils import require_active_client
 
 
-
+from .models import ProcedureFile
 
 # ---------- CONSTANTS / HELPERS ----------
 
@@ -1151,3 +1152,181 @@ def client_complete(request, pk):
 
     messages.success(request, "Проєкт завершено та перенесено в Архів.")
     return redirect("projects_archive")
+
+
+
+@login_required
+def client_step_1(request):
+    client, redirect_resp = require_active_client(request)
+    open_code = request.GET.get("open") or "1_1"
+    if redirect_resp:
+        return redirect_resp
+
+    # --- загрузка файла (прямо на странице) ---
+    if request.method == "POST" and request.FILES.get("file"):
+        procedure_code = (request.POST.get("procedure_code") or "").strip()
+        upload = request.FILES["file"]
+
+        if procedure_code:
+            pf = ProcedureFile.objects.create(
+                client=client,
+                procedure_code=procedure_code,
+                title=upload.name,
+                file=upload,
+                uploaded_by=request.user,
+            )
+
+            from .models import ClientDocument
+            ClientDocument.objects.create(
+                organization=request.organization,
+                client=client,
+                file=pf.file,
+                original_name=upload.name,
+                uploaded_by=request.user,
+                doc_type="procedure",
+                custom_label=f"Step 1 / {procedure_code}",
+            )
+
+            return redirect(reverse("client_step_1") + f"?open={procedure_code}")
+
+        return redirect(reverse("client_step_1"))
+
+
+    procedures = [
+        {"code": "1_1", "short": "1", "title": "1.1 Попередня перевірка",
+         "description": "Збір інформації з відкритих джерел.",
+         "expected": "Профіль клієнта", "status_class": "aap-step--idle"},
+
+        {"code": "1_2", "short": "2", "title": "1.2 Фінансовий моніторинг (AML)",
+         "description": "Перевірка клієнта / бенефіціарів, санкції, ризики.",
+         "expected": "Анкета фінансового моніторингу", "status_class": "aap-step--progress"},
+
+        {"code": "1_3", "short": "3", "title": "1.3 Оцінка ризиків та бюджетування",
+         "description": "Оцінка ресурсів / компетенцій / часу.",
+         "expected": "Excel-розрахунок", "status_class": "aap-step--idle"},
+
+        {"code": "1_4", "short": "4", "title": "1.4 Узгодження умов завдання",
+         "description": "Умови, відповідальність, строки, гонорар.",
+         "expected": "Договір (скан)", "status_class": "aap-step--idle"},
+
+        {"code": "1_5", "short": "5", "title": "1.5 Формування команди та етика",
+         "description": "Призначення ролей, незалежність, конфіденційність.",
+         "expected": "Анкети незалежності", "status_class": "aap-step--idle"},
+
+        {"code": "1_6", "short": "6", "title": "1.6 Ініціалізація файлу CaseWare",
+         "description": "Створення проєкту, структура CW.",
+         "expected": "Структура проєкту CW", "status_class": "aap-step--done"},
+
+        {"code": "1_7", "short": "7", "title": "1.7 Документування прийняття",
+         "description": "Перенесення ключових даних в електронну форму.",
+         "expected": "CW 405", "status_class": "aap-step--idle"},
+
+        {"code": "1_8", "short": "8", "title": "1.8 Початкові залишки / попередній аудитор",
+         "description": "Комунікація та докази щодо залишків.",
+         "expected": "CW 408", "status_class": "aap-step--idle"},
+    ]
+
+    # --- файлы по процедурам ---
+    files = ProcedureFile.objects.filter(client=client).order_by("-created_at")
+
+    files_by_code = {}
+    for f in files:
+        files_by_code.setdefault(f.procedure_code, []).append(f)
+
+    for p in procedures:
+        p_files = files_by_code.get(p["code"], [])
+        p["files"] = p_files
+
+        # если есть файлы — считаем "done"
+        if p["files"]:
+            p["status_class"] = "aap-step--done"
+        else:
+            p["status_class"] = "aap-step--idle"
+
+    context = {
+    "procedures": procedures,
+    "selected_client": client,
+    "open_code": open_code,
+    }
+    return render(request, "core/client_step_1.html", context)
+
+@login_required
+def client_step_2(request):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+    procedures = [
+    {
+        "code": "2_1",
+        "short": "1",
+        "title": "2.1 Визначення стратегії (користувачі та бенчмарк)",
+        "description": "Ідентифікація основних користувачів ФЗ та обґрунтування вибору бази.",
+        "expected": "CW 420 (Розділ A)",
+        "status_class": "aap-step--idle",
+    },
+    {
+        "code": "2_2",
+        "short": "2",
+        "title": "2.2 Розрахунок попередньої суттєвості (Planning Materiality)",
+        "description": "Розрахунок OM, PM та CTT на основі проміжних даних.",
+        "expected": "CW 420 (Колонка «Попередній показник»)",
+        "status_class": "aap-step--idle",
+    },
+    {
+        "code": "2_3",
+        "short": "3",
+        "title": "2.3 Специфічна суттєвість (за потреби)",
+        "description": "Встановлення окремих рівнів суттєвості для чутливих статей.",
+        "expected": "CW 420 (Розділ C)",
+        "status_class": "aap-step--idle",
+    },
+    {
+        "code": "2_4",
+        "short": "4",
+        "title": "2.4 Розрахунок остаточної суттєвості (Final Materiality)",
+        "description": "Перерахунок OM, PM, CTT на основі фактичних даних.",
+        "expected": "CW 420 (Колонка «Остаточний показник»)",
+        "status_class": "aap-step--idle",
+    },
+    {
+        "code": "2_5",
+        "short": "5",
+        "title": "2.5 Оцінка впливу змін суттєвості",
+        "description": "Оцінка достатності доказів та впливу змін суттєвості.",
+        "expected": "CW 420 (Розділ F «Перегляд суттєвості»)",
+        "status_class": "aap-step--idle",
+    },
+]
+
+
+
+    context = {
+        "procedures": procedures,
+        "selected_client": client, 
+    }
+    return render(request, "core/client_step_2.html", context)
+
+
+@login_required
+@require_POST
+def procedure_file_delete(request, pk):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    f = get_object_or_404(
+        ProcedureFile,
+        pk=pk,
+        client=client,
+    )
+
+    code = f.procedure_code
+
+    # удалить сам файл из хранилища
+    if f.file:
+        f.file.delete(save=False)
+
+    # удалить запись
+    f.delete()
+
+    return redirect(reverse("client_step_1") + f"?open={code}")

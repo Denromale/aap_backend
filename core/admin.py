@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Organization, Client, ClientDocument, News
+from .models import ProcedureFile
 
 
 # ---------- ORGANIZATION ----------
@@ -103,3 +104,10 @@ class NewsAdmin(admin.ModelAdmin):
     list_display = ("title", "created_at", "is_published")
     list_filter = ("is_published", "created_at")
     search_fields = ("title", "body")
+
+@admin.register(ProcedureFile)
+class ProcedureFileAdmin(admin.ModelAdmin):
+    list_display = ("id", "client", "procedure_code", "file", "uploaded_by", "created_at")
+    list_filter = ("procedure_code", "created_at")
+    search_fields = ("client__name", "procedure_code", "file")
+    ordering = ("-created_at",)

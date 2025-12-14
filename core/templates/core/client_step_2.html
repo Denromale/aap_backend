@@ -1,0 +1,101 @@
+{% extends "core/base.html" %}
+
+{% load i18n %}
+
+{% block title %}
+КРОК 2 – ВИЗНАЧЕННЯ СУТТЄВОСТІ
+{% endblock %}
+
+{% block content %}
+{# ====== СТЕППЕР ПРОЦЕДУР (2.1–2.5) ====== #}
+<div class="aap-stepper" id="aapStepper">
+  {% for p in procedures %}
+    <div class="aap-step {{ p.status_class }}" data-code="{{ p.code }}" role="button" tabindex="0">
+      {{ p.short }}
+    </div>
+
+    {% if not forloop.last %}
+      <div class="aap-step-line"></div>
+    {% endif %}
+  {% endfor %}
+</div>
+<h2>КРОК 2 - ВИЗНАЧЕННЯ СУТТЄВОСТІ </h2>
+
+<p class="page-subtitle">
+    Мета: Встановити рівні суттєвості (загальну, виконавчу та поріг незначних викривлень) для визначення обсягу аудиторських процедур та оцінки викривлень.    
+</p>
+<p class="page-subtitle">
+    Документування: Партнер із завдання затверджує попередню суттєвість для початку аудиторських процедур. 
+    На етапі завершення Партнер переглядає та затверджує остаточну суттєвість, підтверджуючи, що:
+</p>
+
+<ul class="page-subtitle-list">
+    <li>зміни у фінансових показниках (між 30.09 та 31.12) враховані коректно;</li>
+    <li>обсяг виконаних процедур є достатнім навіть за умови зміни рівня суттєвості;</li>
+    <li>оцінка невиправлених викривлень проведена на основі остаточної (найбільш актуальної) суттєвості.</li>
+</ul>
+<!-- тут позже будет логика, формы, чеклисты -->
+
+{% if selected_client %}
+  <div style="margin-bottom: 20px; padding: 12px 16px; background: #fff; border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(15,23,42,0.08);">
+    <p>
+      <strong>Клієнт:</strong> {{ selected_client.name }}
+      <strong>Звітний період:</strong> {{ selected_client.reporting_period }}
+      <strong>№ договору:</strong> {{ selected_client.requisites_number }}
+    </p>
+  </div>
+{% else %}
+  <p>
+    Спочатку оберіть проєкт на сторінці
+    «<a href="{% url 'dashboard' %}">Призначені проєкти</a>».
+  </p>
+{% endif %}
+
+
+{# ====== КОНТЕНТ ДЛЯ КАЖДОЙ ПРОЦЕДУРЫ ====== #}
+<div class="aap-step-panels" id="aapStepPanels">
+  {% for p in procedures %}
+    <div class="aap-step-panel" id="panel-{{ p.code }}">
+      <h4 style="margin:0 0 8px;">{{ p.title }}</h4>
+      <p style="margin:0 0 12px; color:#6b7280;">{{ p.description }}</p>
+
+      <div class="card" style="padding:12px;">
+        <b>Документ (результат):</b> {{ p.expected }}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<script>
+    (function () {
+      const stepper = document.getElementById('aapStepper');
+      const steps = stepper ? stepper.querySelectorAll('.aap-step') : [];
+      const panels = document.querySelectorAll('.aap-step-panel');
+  
+      function openPanel(code) {
+        // снять активность
+        steps.forEach(s => s.classList.remove('is-active'));
+        panels.forEach(p => p.classList.remove('is-open'));
+  
+        // активировать нужное
+        const activeStep = stepper.querySelector(`.aap-step[data-code="${code}"]`);
+        const activePanel = document.getElementById(`panel-${code}`);
+  
+        if (activeStep) activeStep.classList.add('is-active');
+        if (activePanel) activePanel.classList.add('is-open');
+      }
+  
+      // клики
+      steps.forEach(s => {
+        s.addEventListener('click', () => openPanel(s.dataset.code));
+        s.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') openPanel(s.dataset.code);
+        });
+      });
+  
+      // открыть первый по умолчанию
+      if (steps.length) openPanel(steps[0].dataset.code);
+    })();
+  </script>
+{% endblock %}

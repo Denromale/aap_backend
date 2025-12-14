@@ -30,7 +30,11 @@ urlpatterns = [
     path("metrics/", views.metrics_view, name="metrics"),
     path("clients/<int:pk>/complete/", views.client_complete, name="client_complete"),
     path("projects/archive/", views.projects_archive, name="projects_archive"),
-   
+    path("client/step-1/", views.client_step_1, name="client_step_1"),
+    path("client/step-2/", views.client_step_2, name="client_step_2"),
+    path("procedure-file/<int:pk>/delete/", views.procedure_file_delete, name="procedure_file_delete"),
+
+
 ]
 
 

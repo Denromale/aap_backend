@@ -26,9 +26,41 @@
             margin-top: 3px;
         }
     </style>
-    
+    <style>
+        /* TEMP: debug + final behavior for audit dropdown */
+        
+        .sidebar-summary { display:flex !important; align-items:center !important; width:100% !important; }
+        .sidebar-summary::-webkit-details-marker { display:none !important; }
+        
+        .sidebar-summary-text { flex: 1 1 auto !important; }
+        
+        .sidebar-summary-arrow {
+          margin-left: auto !important;
+          display: inline-block !important;
+          transform: rotate(0deg) !important;
+          transform-origin: 50% 50% !important;
+          transition: transform 0.15s ease !important;
+        }
+        
+        /* rotate when open */
+        details[open] > summary .sidebar-summary-arrow { transform: rotate(90deg) !important; }
+        
+        /* submenu align right */
+        .sidebar-submenu {
+          margin-top: 8px !important;
+          padding-left: 0 !important;
+        }
+        
+        .sidebar-sublink {
+          display: block !important;
+          width: fit-content !important;      /* ключевое: не на всю ширину */
+          margin-left: auto !important;       /* прижать вправо */
+          text-align: right !important;
+        }
     </style>
+        
 </head>
+
 <body class="app-body">
 
 <div class="app-shell">
@@ -45,19 +77,48 @@
                    class="sidebar-link{% if request.resolver_match.url_name == 'home' %} is-active{% endif %}">
                     Головна
                 </a>
+            
                 <a href="{% url 'dashboard' %}"
                    class="sidebar-link{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}">
-                   Призначені проєкти
+                    Призначені проєкти
                 </a>
-                <a href="{% url 'requests' %}"
-                   class="sidebar-link{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
-                    Запити
-                </a>
-                <a href="{% url 'documents' %}"
-                   class="sidebar-link{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
-                    База документів
-                </a>
+            
+                <!-- НОВОЕ: Аудиторські процедури (dropdown) -->
+                <details id="audit-procedures-menu" class="sidebar-details"
+                    {% if request.resolver_match.url_name == 'requests' or request.resolver_match.url_name == 'documents' %}open{% endif %}>
+
+                  <summary class="sidebar-link sidebar-summary
+                    {% if request.resolver_match.url_name == 'requests' or request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
+                    <span class="sidebar-summary-text">Аудиторські процедури</span>
+                    <span class="sidebar-summary-arrow">▶</span>
+                  </summary>
+
+                  <a href="{% url 'client_step_1' %}"
+                     class="sidebar-link{% if request.resolver_match.url_name == 'client_step_1' %} is-active{% endif %}">
+                      КРОК 1 – ПРИЙНЯТТЯ КЛІЄНТА
+                  </a>
+
+                  <a href="{% url 'client_step_2' %}"
+                    class="sidebar-link{% if request.resolver_match.url_name == 'client_step_2' %} is-active{% endif %}">
+                     КРОК 2 - ВИЗНАЧЕННЯ СУТТЄВОСТІ
+                  </a>
+
+                  <div class="sidebar-submenu">
+                    <a href="{% url 'requests' %}"
+                      class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
+                       Запити
+                    </a>
+                    <a href="{% url 'documents' %}"
+                      class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
+                       База документів
+                    </a>
+                  </div>
+
+                </details>
+
+              
             </nav>
+            
         </div>
 
         <div class="sidebar-bottom">
@@ -120,11 +181,30 @@
 
         <main class="main-content">
             <div class="page-card">
-                {% block content %}{% endblock %}
+                {% block page_top %}
+                {% endblock %}
+            
+                {% block content %}
+                {% endblock %}
             </div>
         </main>
     </div>
 </div>
 
 </body>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menu = document.getElementById("audit-procedures-menu");
+        if (!menu) return;
+    
+        // восстановление состояния
+        const isOpen = sessionStorage.getItem("auditProceduresOpen");
+        if (isOpen === "true") menu.open = true;
+    
+        // сохранение состояния при открытии/закрытии
+        menu.addEventListener("toggle", function () {
+            sessionStorage.setItem("auditProceduresOpen", menu.open ? "true" : "false");
+        });
+    });
+    </script>
 </html>

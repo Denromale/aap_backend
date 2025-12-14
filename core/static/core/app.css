@@ -559,3 +559,165 @@ input[type="submit"].btn-primary {
     background: #f9fafb;
     font-weight: 600;
 }
+
+/* === AAP Sidebar: Audit procedures dropdown (FINAL, size = same as .sidebar-link) === */
+/* === Dropdown: Audit procedures (same width as other sidebar-link) === */
+
+summary.sidebar-link.sidebar-summary {
+    position: relative !important;
+    display: block !important;     /* ВАЖНО: как обычный .sidebar-link */
+    width: auto !important;        /* не растягиваем больше, чем другие */
+    cursor: pointer !important;
+    user-select: none !important;
+  }
+  
+  summary.sidebar-link.sidebar-summary::-webkit-details-marker {
+    display: none !important;
+  }
+  
+  /* стрелка НЕ влияет на ширину, всегда справа */
+  summary.sidebar-link.sidebar-summary .sidebar-summary-arrow {
+    position: absolute !important;
+    right: 10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) rotate(0deg) !important;
+    transform-origin: 50% 50% !important;
+    transition: transform 0.15s ease !important;
+    line-height: 1 !important;
+  }
+  
+  /* открыто -> вниз */
+  details[open] > summary.sidebar-link.sidebar-summary .sidebar-summary-arrow {
+    transform: translateY(-50%) rotate(90deg) !important;
+  }
+  
+  /* подменю справа */
+  .sidebar-submenu {
+    margin-top: 6px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    gap: 6px !important;
+  }
+  
+  /* пункты подменю справа */
+  .sidebar-submenu a.sidebar-link.sidebar-sublink {
+    width: auto !important;
+    display: inline-block !important;
+    text-align: right !important;
+  }
+
+  /* список с тем же шрифтом, что и page-subtitle */
+.page-subtitle-list {
+    margin: 6px 0 16px 24px;
+    padding: 0;
+
+    font-size: 14px;        /* как у .page-subtitle */
+    color: #6b7280;         /* тот же цвет */
+    line-height: 1.5;
+    font-family: inherit;  /* КЛЮЧЕВОЕ */
+}
+
+.page-subtitle-list li {
+    margin-bottom: 6px;
+}
+/* ====== STEP 1: верхний степпер процедур ====== */
+.aap-stepper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+  
+  .aap-step {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    border: 2px solid #cbd5e1;
+    background: #f8fafc;
+    color: #64748b;
+    transition: transform .05s ease-in-out;
+  }
+  
+  .aap-step:active { transform: scale(0.98); }
+  
+  .aap-step-line {
+    flex: 1;
+    height: 2px;
+    background: #cbd5e1;
+    min-width: 20px;
+  }
+  
+  /* Состояния (цвета) */
+  .aap-step--idle { /* серый по умолчанию */ }
+  
+  .aap-step--progress {
+    background: #fde68a;
+    border-color: #facc15;
+    color: #92400e;
+  }
+  
+  .aap-step--done {
+    background: #22c55e;
+    border-color: #16a34a;
+    color: #ffffff;
+  }
+  
+  .aap-step--failed {
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #ffffff;
+  }
+  
+/* Базовый кружок */
+.aap-step {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  /* Выполнен */
+  .aap-step--done {
+    background: #22c55e;
+    color: #fff;
+  }
+  
+  /* В процессе */
+  .aap-step--progress {
+    background: #facc15;
+    color: #000;
+  }
+  
+  /* Активный шаг */
+  .aap-step.is-active {
+    box-shadow: 0 0 0 4px rgba(0, 41, 107, 0.25);
+    transform: scale(1.05);
+  }
+  
+  /* Панели */
+  .aap-step-panels {
+    margin-top: 8px;
+  }
+  
+  .aap-step-panel {
+    display: none;
+  }
+  
+  .aap-step-panel.is-open {
+    display: block;
+  }
+  
