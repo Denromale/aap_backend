@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 from docx import Document
 
 from .forms import ClientForm
-from .models import Client, ClientDocument, News
+from .models import Client, ClientDocument, News, AuditStep, AuditSubStep, StepAction
 from .decorators import is_manager, manager_required
 
 from django.contrib import messages
@@ -1157,154 +1157,11 @@ def client_complete(request, pk):
 
 @login_required
 def client_step_1(request):
-    client, redirect_resp = require_active_client(request)
-    open_code = request.GET.get("open") or "1_1"
-    if redirect_resp:
-        return redirect_resp
-
-    # --- загрузка файла (прямо на странице) ---
-    if request.method == "POST" and request.FILES.get("file"):
-        procedure_code = (request.POST.get("procedure_code") or "").strip()
-        upload = request.FILES["file"]
-
-        if procedure_code:
-            pf = ProcedureFile.objects.create(
-                client=client,
-                procedure_code=procedure_code,
-                title=upload.name,
-                file=upload,
-                uploaded_by=request.user,
-            )
-
-            from .models import ClientDocument
-            ClientDocument.objects.create(
-                organization=request.organization,
-                client=client,
-                file=pf.file,
-                original_name=upload.name,
-                uploaded_by=request.user,
-                doc_type="procedure",
-                custom_label=f"Step 1 / {procedure_code}",
-            )
-
-            return redirect(reverse("client_step_1") + f"?open={procedure_code}")
-
-        return redirect(reverse("client_step_1"))
-
-
-    procedures = [
-        {"code": "1_1", "short": "1", "title": "1.1 Попередня перевірка",
-         "description": "Збір інформації з відкритих джерел.",
-         "expected": "Профіль клієнта", "status_class": "aap-step--idle"},
-
-        {"code": "1_2", "short": "2", "title": "1.2 Фінансовий моніторинг (AML)",
-         "description": "Перевірка клієнта / бенефіціарів, санкції, ризики.",
-         "expected": "Анкета фінансового моніторингу", "status_class": "aap-step--progress"},
-
-        {"code": "1_3", "short": "3", "title": "1.3 Оцінка ризиків та бюджетування",
-         "description": "Оцінка ресурсів / компетенцій / часу.",
-         "expected": "Excel-розрахунок", "status_class": "aap-step--idle"},
-
-        {"code": "1_4", "short": "4", "title": "1.4 Узгодження умов завдання",
-         "description": "Умови, відповідальність, строки, гонорар.",
-         "expected": "Договір (скан)", "status_class": "aap-step--idle"},
-
-        {"code": "1_5", "short": "5", "title": "1.5 Формування команди та етика",
-         "description": "Призначення ролей, незалежність, конфіденційність.",
-         "expected": "Анкети незалежності", "status_class": "aap-step--idle"},
-
-        {"code": "1_6", "short": "6", "title": "1.6 Ініціалізація файлу CaseWare",
-         "description": "Створення проєкту, структура CW.",
-         "expected": "Структура проєкту CW", "status_class": "aap-step--done"},
-
-        {"code": "1_7", "short": "7", "title": "1.7 Документування прийняття",
-         "description": "Перенесення ключових даних в електронну форму.",
-         "expected": "CW 405", "status_class": "aap-step--idle"},
-
-        {"code": "1_8", "short": "8", "title": "1.8 Початкові залишки / попередній аудитор",
-         "description": "Комунікація та докази щодо залишків.",
-         "expected": "CW 408", "status_class": "aap-step--idle"},
-    ]
-
-    # --- файлы по процедурам ---
-    files = ProcedureFile.objects.filter(client=client).order_by("-created_at")
-
-    files_by_code = {}
-    for f in files:
-        files_by_code.setdefault(f.procedure_code, []).append(f)
-
-    for p in procedures:
-        p_files = files_by_code.get(p["code"], [])
-        p["files"] = p_files
-
-        # если есть файлы — считаем "done"
-        if p["files"]:
-            p["status_class"] = "aap-step--done"
-        else:
-            p["status_class"] = "aap-step--idle"
-
-    context = {
-    "procedures": procedures,
-    "selected_client": client,
-    "open_code": open_code,
-    }
-    return render(request, "core/client_step_1.html", context)
+    return redirect("audit_step", step_order=1)
 
 @login_required
 def client_step_2(request):
-    client, redirect_resp = require_active_client(request)
-    if redirect_resp:
-        return redirect_resp
-    procedures = [
-    {
-        "code": "2_1",
-        "short": "1",
-        "title": "2.1 Визначення стратегії (користувачі та бенчмарк)",
-        "description": "Ідентифікація основних користувачів ФЗ та обґрунтування вибору бази.",
-        "expected": "CW 420 (Розділ A)",
-        "status_class": "aap-step--idle",
-    },
-    {
-        "code": "2_2",
-        "short": "2",
-        "title": "2.2 Розрахунок попередньої суттєвості (Planning Materiality)",
-        "description": "Розрахунок OM, PM та CTT на основі проміжних даних.",
-        "expected": "CW 420 (Колонка «Попередній показник»)",
-        "status_class": "aap-step--idle",
-    },
-    {
-        "code": "2_3",
-        "short": "3",
-        "title": "2.3 Специфічна суттєвість (за потреби)",
-        "description": "Встановлення окремих рівнів суттєвості для чутливих статей.",
-        "expected": "CW 420 (Розділ C)",
-        "status_class": "aap-step--idle",
-    },
-    {
-        "code": "2_4",
-        "short": "4",
-        "title": "2.4 Розрахунок остаточної суттєвості (Final Materiality)",
-        "description": "Перерахунок OM, PM, CTT на основі фактичних даних.",
-        "expected": "CW 420 (Колонка «Остаточний показник»)",
-        "status_class": "aap-step--idle",
-    },
-    {
-        "code": "2_5",
-        "short": "5",
-        "title": "2.5 Оцінка впливу змін суттєвості",
-        "description": "Оцінка достатності доказів та впливу змін суттєвості.",
-        "expected": "CW 420 (Розділ F «Перегляд суттєвості»)",
-        "status_class": "aap-step--idle",
-    },
-]
-
-
-
-    context = {
-        "procedures": procedures,
-        "selected_client": client, 
-    }
-    return render(request, "core/client_step_2.html", context)
+    return redirect("audit_step", step_order=2)
 
 
 @login_required
@@ -1330,3 +1187,83 @@ def procedure_file_delete(request, pk):
     f.delete()
 
     return redirect(reverse("client_step_1") + f"?open={code}")
+
+def action_allowed_for_user(action: StepAction, user, client) -> bool:
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+
+    # доступ к проекту: только участники команды проекта
+    if not user_in_client_team(user, client):
+        return False
+
+    # если группы не заданы — разрешаем всем участникам проекта
+    if action.allowed_groups.count() == 0:
+        return True
+
+    # иначе — только тем, кто в нужных группах
+    return user.groups.filter(id__in=action.allowed_groups.values_list("id", flat=True)).exists()
+
+# =================== AUDIT STEP SYSTEM (NEW UNIVERSAL PAGE) ===================
+
+@login_required
+def audit_step_view(request, step_order: int):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    step = get_object_or_404(AuditStep, order=step_order, is_active=True)
+    substeps = AuditSubStep.objects.filter(step=step, is_active=True).order_by("order")
+
+    # действия уровня шага
+    step_actions_qs = (
+        step.actions
+        .filter(enabled=True, scope=StepAction.Scope.STEP)
+        .order_by("order", "id")
+        .prefetch_related("allowed_groups")
+    )
+    step_actions = [a for a in step_actions_qs if action_allowed_for_user(a, request.user, client)]
+
+    # действия уровня подшагов
+    substep_actions_map = {}
+    for s in substeps:
+        qs = (
+            s.actions
+            .filter(enabled=True, scope=StepAction.Scope.SUBSTEP)
+            .order_by("order", "id")
+            .prefetch_related("allowed_groups")
+        )
+        substep_actions_map[s.id] = [a for a in qs if action_allowed_for_user(a, request.user, client)]
+
+    context = {
+        "selected_client": client,
+        "step": step,
+        "substeps": substeps,
+        "step_actions": step_actions,
+        "substep_actions_map": substep_actions_map,
+    }
+    return render(request, "core/audit_step.html", context)
+
+@login_required
+@require_POST
+def audit_step_action_run(request, step_order: int, key: str):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    step = get_object_or_404(AuditStep, order=step_order, is_active=True)
+
+    action = get_object_or_404(
+        StepAction,
+        step=step,
+        scope=StepAction.Scope.STEP,
+        key=key,
+        enabled=True,
+    )
+
+    if not action_allowed_for_user(action, request.user, client):
+        return HttpResponseForbidden("Немає прав виконувати цю дію.")
+
+    messages.success(request, f"Дію виконано: {action.label}")
+    return redirect("audit_step", step_order=step_order)

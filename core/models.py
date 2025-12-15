@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-
+from django.contrib.auth.models import Group
 
 # =================== ОРГАНІЗАЦІЯ ===================
 
@@ -523,3 +523,109 @@ class ProcedureFile(models.Model):
     def __str__(self):
         return f"{self.client_id} / {self.procedure_code} / {self.file.name}"
 
+# =================== AUDIT STEP SYSTEM (TEMPLATES) ===================
+
+class AuditStep(models.Model):
+    title = models.CharField(_("Назва кроку"), max_length=255)
+    purpose = models.TextField(_("Мета"), blank=True)
+    documentation = models.TextField(_("Документування"), blank=True)
+    procedure_description = models.TextField(_("Опис процедур"), blank=True)
+    expected_result = models.TextField(_("Очікуваний результат"), blank=True)
+
+    order = models.PositiveIntegerField(_("Порядок"), default=1, db_index=True)
+    is_active = models.BooleanField(_("Активний"), default=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = _("Крок аудиту (шаблон)")
+        verbose_name_plural = _("Кроки аудиту (шаблони)")
+
+    def __str__(self) -> str:
+        return f"{self.order}. {self.title}"
+
+
+class AuditSubStep(models.Model):
+    step = models.ForeignKey(
+        AuditStep,
+        on_delete=models.CASCADE,
+        related_name="substeps",
+        verbose_name=_("Крок"),
+    )
+
+    title = models.CharField(_("Назва підкроку"), max_length=255)
+    purpose = models.TextField(_("Мета"), blank=True)
+    documentation = models.TextField(_("Документування"), blank=True)
+    procedure_description = models.TextField(_("Опис процедур"), blank=True)
+    expected_result = models.TextField(_("Очікуваний результат"), blank=True)
+
+    order = models.PositiveIntegerField(_("Порядок"), default=1, db_index=True)
+    is_active = models.BooleanField(_("Активний"), default=True)
+
+    class Meta:
+        ordering = ["step__order", "order", "id"]
+        verbose_name = _("Підкрок аудиту (шаблон)")
+        verbose_name_plural = _("Підкроки аудиту (шаблони)")
+        unique_together = (("step", "order"),)
+
+    def __str__(self) -> str:
+        return f"{self.step.order}.{self.order} {self.title}"
+
+
+class StepAction(models.Model):
+    class Scope(models.TextChoices):
+        STEP = "step", _("На кроці")
+        SUBSTEP = "substep", _("На підкроці")
+
+    class Placement(models.TextChoices):
+        TOP = "top", _("Вгорі")
+        INLINE = "inline", _("У блоці")
+        BOTTOM = "bottom", _("Внизу")
+
+    key = models.SlugField(_("Ключ"), max_length=80)
+    label = models.CharField(_("Текст кнопки"), max_length=120)
+    description = models.CharField(_("Опис"), max_length=255, blank=True)
+
+    enabled = models.BooleanField(_("Увімкнено"), default=True)
+    order = models.PositiveIntegerField(_("Порядок"), default=1, db_index=True)
+
+    scope = models.CharField(_("Де доступна"), max_length=20, choices=Scope.choices, default=Scope.STEP)
+    placement = models.CharField(_("Де показувати"), max_length=20, choices=Placement.choices, default=Placement.INLINE)
+
+    # Прив'язка дії або до Step, або до SubStep (залежно від scope)
+    step = models.ForeignKey(
+        AuditStep,
+        on_delete=models.CASCADE,
+        related_name="actions",
+        verbose_name=_("Крок"),
+        null=True,
+        blank=True,
+    )
+    substep = models.ForeignKey(
+        AuditSubStep,
+        on_delete=models.CASCADE,
+        related_name="actions",
+        verbose_name=_("Підкрок"),
+        null=True,
+        blank=True,
+    )
+
+    allowed_groups = models.ManyToManyField(
+        Group,
+        blank=True,
+        related_name="aap_step_actions",
+        verbose_name=_("Дозволені групи"),
+        help_text=_("Хто може бачити/виконувати цю дію."),
+    )
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = _("Дія кроку (кнопка)")
+        verbose_name_plural = _("Дії кроків (кнопки)")
+        constraints = [
+            models.UniqueConstraint(fields=["step", "key"], name="uniq_action_key_per_step"),
+            models.UniqueConstraint(fields=["substep", "key"], name="uniq_action_key_per_substep"),
+        ]
+
+    def __str__(self) -> str:
+        target = self.step or self.substep
+        return f"{self.label} ({self.key}) -> {target}"

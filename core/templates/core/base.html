@@ -84,37 +84,44 @@
                 </a>
             
                 <!-- НОВОЕ: Аудиторські процедури (dropdown) -->
-                <details id="audit-procedures-menu" class="sidebar-details"
-                    {% if request.resolver_match.url_name == 'requests' or request.resolver_match.url_name == 'documents' %}open{% endif %}>
-
-                  <summary class="sidebar-link sidebar-summary
-                    {% if request.resolver_match.url_name == 'requests' or request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
-                    <span class="sidebar-summary-text">Аудиторські процедури</span>
-                    <span class="sidebar-summary-arrow">▶</span>
-                  </summary>
-
-                  <a href="{% url 'client_step_1' %}"
-                     class="sidebar-link{% if request.resolver_match.url_name == 'client_step_1' %} is-active{% endif %}">
-                      КРОК 1 – ПРИЙНЯТТЯ КЛІЄНТА
-                  </a>
-
-                  <a href="{% url 'client_step_2' %}"
-                    class="sidebar-link{% if request.resolver_match.url_name == 'client_step_2' %} is-active{% endif %}">
-                     КРОК 2 - ВИЗНАЧЕННЯ СУТТЄВОСТІ
-                  </a>
-
-                  <div class="sidebar-submenu">
-                    <a href="{% url 'requests' %}"
-                      class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
-                       Запити
+                {% with u=request.resolver_match.url_name %}
+                {% if u == "audit_step" or u == "requests" or u == "documents" %}
+                  <details id="audit-procedures-menu" class="sidebar-details" open>
+                {% else %}
+                  <details id="audit-procedures-menu" class="sidebar-details">
+                {% endif %}
+                {% endwith %}
+              
+              
+                {% with u=request.resolver_match.url_name %}
+                <summary class="sidebar-link sidebar-summary{% if u == 'audit_step' or u == 'requests' or u == 'documents' %} is-active{% endif %}">
+                {% endwith %}
+              
+                  <span class="sidebar-summary-text">Аудиторські процедури</span>
+                  <span class="sidebar-summary-arrow">▶</span>
+                </summary>
+              
+              
+                <!-- ЕДИНСТВЕННЫЙ ПУНКТ АУДИТА -->
+                <div class="sidebar-submenu">
+                    <a href="{% url 'audit_step' 1 %}"
+                       class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'audit_step' %} is-active{% endif %}">
+                      Програма аудиту
                     </a>
+                  
+                    <a href="{% url 'requests' %}"
+                       class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'requests' %} is-active{% endif %}">
+                      Запити
+                    </a>
+                  
                     <a href="{% url 'documents' %}"
-                      class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
-                       База документів
+                       class="sidebar-link sidebar-sublink{% if request.resolver_match.url_name == 'documents' %} is-active{% endif %}">
+                      База документів
                     </a>
                   </div>
-
-                </details>
+                  
+              </details>
+              
 
               
             </nav>
@@ -153,35 +160,53 @@
     <!-- ПРАВА ЧАСТИНА -->
     <div class="app-main">
         <header class="topbar">
-            <div class="topbar-title">
-                {% if request.organization %}
-                    {{ request.organization.name }}
-                {% else %}
-                    Automated Auditing Processes
-                {% endif %}
-            </div>
-            <div class="topbar-right">
-                {% if request.user.is_authenticated %}
-                    <div class="topbar-user">
-                        <div class="topbar-avatar">
-                            {{ request.user.first_name|default:""|slice:":1" }}{{ request.user.last_name|default:""|slice:":1" }}
-                        </div>
-                        <div class="topbar-user-info">
-                            <div class="topbar-user-name">
-                                {{ request.user.get_full_name|default:request.user.username }}
-                            </div>
-                            <div class="topbar-user-role">
-                                Користувач
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
+            
+            <div class="topbar-right"
+            style="display:flex; align-items:center; gap:14px; width:100%;">
+       
+           {% if request.user.is_authenticated %}
+       
+               {% if active_client %}
+                   <div class="topbar-project"
+                        style="
+                           margin-right:auto;
+                           font-weight:600;
+                           color:#0f172a;
+                           white-space:nowrap;
+                           overflow:hidden;
+                           text-overflow:ellipsis;
+                           max-width:70%;
+                        ">
+                       {{ active_client.display_label }}
+                   </div>
+               {% endif %}
+       
+               <div class="topbar-user">
+                   <div class="topbar-avatar">
+                       {{ request.user.first_name|default:""|slice:":1" }}{{ request.user.last_name|default:""|slice:":1" }}
+                   </div>
+                   <div class="topbar-user-info">
+                       <div class="topbar-user-name">
+                           {{ request.user.get_full_name|default:request.user.username }}
+                       </div>
+                       <div class="topbar-user-role">
+                           {% if request.organization %}
+                               {{ request.organization.name }}
+                           {% endif %}
+                       </div>
+                   </div>
+               </div>
+       
+           {% endif %}
+       </div>
+       
+            
         </header>
 
         <main class="main-content">
             <div class="page-card">
                 {% block page_top %}
+                    
                 {% endblock %}
             
                 {% block content %}

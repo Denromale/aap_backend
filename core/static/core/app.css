@@ -591,21 +591,25 @@ summary.sidebar-link.sidebar-summary {
     transform: translateY(-50%) rotate(90deg) !important;
   }
   
-  /* подменю справа */
+   /* подменю справа */
   .sidebar-submenu {
     margin-top: 6px !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: flex-end !important;
+    align-items: stretch !important;  /* важно: растягиваем элементы */
     gap: 6px !important;
   }
   
-  /* пункты подменю справа */
+  /* пункты подменю как обычные sidebar-link, но текст вправо */
   .sidebar-submenu a.sidebar-link.sidebar-sublink {
-    width: auto !important;
-    display: inline-block !important;
-    text-align: right !important;
+    display: block !important;        /* не inline-block */
+    width: 100% !important;           /* занимает всю ширину меню */
+    text-align: right !important;     /* текст прижат вправо */
+    padding-right: 16px !important;   /* как у остальных пунктов */
+    padding-left: 16px !important;    /* оставляем общий отступ слева */
+    box-sizing: border-box !important;
   }
+  
 
   /* список с тем же шрифтом, что и page-subtitle */
 .page-subtitle-list {
@@ -719,5 +723,39 @@ summary.sidebar-link.sidebar-summary {
   
   .aap-step-panel.is-open {
     display: block;
+  }
+  
+  /* === Audit submenu: align items like "Запити" === */
+
+.sidebar-submenu {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* сам пункт прижимаем вправо */
+.sidebar-submenu a.sidebar-link.sidebar-sublink {
+    align-self: flex-end !important;   /* 🔑 КЛЮЧ */
+    width: fit-content !important;     /* по ширине текста */
+    text-align: right !important;
+    padding-right: 16px !important;
+}
+/* === Audit submenu: force-right like "Запити" / "База документів" === */
+
+.sidebar-submenu {
+    margin-top: 6px !important;
+    padding-left: 0 !important;
+  }
+  
+  /* делаем пункт на всю ширину контейнера и прижимаем текст вправо */
+  .sidebar-submenu a.sidebar-link.sidebar-sublink {
+    display: block !important;
+    width: 100% !important;
+    text-align: right !important;
+  
+    /* главное: толкаем вправо даже если где-то есть другие стили */
+    margin-left: auto !important;
+  
+    /* чтобы визуально совпало с остальными пунктами по отступам */
+    padding-right: 16px !important;
   }
   
