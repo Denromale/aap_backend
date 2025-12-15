@@ -8,7 +8,9 @@
 {% block content %}
 
 {# Верхний степпер 1–12 (кликабельный) #}
-<div class="aap-stepper">
+<div class="aap-stepper aap-stepper--top">
+  {% for n in "123456789101112"|make_list %}
+  {% endfor %}
   <a class="aap-step aap-step--idle {% if step.order == 1 %}is-active{% endif %}" href="{% url 'audit_step' 1 %}">1</a>
   <div class="aap-step-line"></div>
   <a class="aap-step aap-step--idle {% if step.order == 2 %}is-active{% endif %}" href="{% url 'audit_step' 2 %}">2</a>
@@ -34,157 +36,179 @@
   <a class="aap-step aap-step--idle {% if step.order == 12 %}is-active{% endif %}" href="{% url 'audit_step' 12 %}">12</a>
 </div>
 
-<h2>КРОК {{ step.order }} - {{ step.title }}</h2>
+<h2 class="audit-step-title">КРОК {{ step.order }} - {{ step.title }}</h2>
 
 {% if step.purpose %}
-  <p class="page-subtitle">
-    <b>Мета:</b> {{ step.purpose|linebreaksbr }}
-  </p>
+<div class="step-inline">
+  <span class="step-inline-label">Мета:</span>
+  <span class="step-inline-body">
+    {{ step.purpose|linebreaks }}
+  </span>
+</div>
 {% endif %}
 
 {% if step.documentation %}
-  <p class="page-subtitle">
-    <b>Документування:</b> {{ step.documentation|linebreaksbr }}
-  </p>
+<div class="step-inline">
+  <span class="step-inline-label">Документування:</span>
+  <span class="step-inline-body">
+    {{ step.documentation|linebreaks }}
+  </span>
+</div>
 {% endif %}
 
 {% if step.procedure_description %}
-  <p class="page-subtitle">
-    <b>Опис процедур:</b> {{ step.procedure_description|linebreaksbr }}
-  </p>
+<div class="step-inline">
+  <span class="step-inline-label">Опис процедур:</span>
+  <span class="step-inline-body">
+    {{ step.procedure_description|linebreaks }}
+  </span>
+</div>
 {% endif %}
 
 {% if step.expected_result %}
-  <p class="page-subtitle">
-    <b>Очікуваний результат:</b> {{ step.expected_result|linebreaksbr }}
-  </p>
+<div class="step-inline step-inline--result">
+  <span class="step-inline-label">Очікуваний результат:</span>
+  <span class="step-inline-body">
+    {{ step.expected_result|linebreaks }}
+  </span>
+</div>
 {% endif %}
 
-{% if selected_client %}
-  
-{% else %}
-  <p>
+{% if not selected_client %}
+  <p class="audit-hint">
     Спочатку оберіть проєкт на сторінці
     «<a href="{% url 'dashboard' %}">Призначені проєкти</a>».
   </p>
-{% endif %}
+{% else %}
 
+  {# Подшаги: степпер + панели #}
+  <div class="aap-stepper aap-stepper--sub" id="subStepper">
+    {% for s in substeps %}
+      <div class="aap-step aap-step--idle {% if forloop.first %}is-active{% endif %}"
+           data-code="{{ s.id }}" role="button" tabindex="0">
+        {{ s.order }}
+      </div>
+      {% if not forloop.last %}<div class="aap-step-line"></div>{% endif %}
+    {% endfor %}
+  </div>
 
-
-{# Подшаги НЕ списком: делаем подшаг-степпер + панели как в step-1 #}
-<div class="aap-stepper" id="subStepper" style="margin-top: 10px;">
-  {% for s in substeps %}
-    <div class="aap-step aap-step--idle {% if forloop.first %}is-active{% endif %}"
-         data-code="{{ s.id }}" role="button" tabindex="0">
-      {{ s.order }}
-    </div>
-
-    {% if not forloop.last %}
-      <div class="aap-step-line"></div>
-    {% endif %}
-  {% endfor %}
-</div>
-
-<div class="aap-step-panels" id="subPanels">
-  {% for s in substeps %}
+  <div class="aap-step-panels" id="subPanels">
+    {% for s in substeps %}
     <div class="aap-step-panel {% if forloop.first %}is-open{% endif %}" id="panel-{{ s.id }}">
+  
       <h4 style="margin:0 0 8px;">{{ step.order }}.{{ s.order }} {{ s.title }}</h4>
-
-      {% if s.procedure_description %}
-        <p style="margin:0 0 12px; color:#6b7280;">{{ s.procedure_description|linebreaksbr }}</p>
-      {% endif %}
-
-      {% if s.expected_result %}
-        <div class="card" style="padding:12px;">
-          <b>Очікуваний результат:</b> {{ s.expected_result|linebreaksbr }}
+  
+      {# --- 4 блока подшага: как в зеленом --- #}
+  
+      {% if s.purpose %}
+        <div class="step-inline">
+          <span class="step-inline-label"><b>Мета:</b></span>
+          <span class="step-inline-body">{{ s.purpose|linebreaks }}</span>
         </div>
       {% endif %}
-
-      {# (следующий шаг) сюда добавим:
-         - кнопки действий подшага
-         - кнопку "Добавить документ" + список документов подшага
-      #}
+  
+      {% if s.documentation %}
+        <div class="step-inline">
+          <span class="step-inline-label"><b>Документування:</b></span>
+          <span class="step-inline-body">{{ s.documentation|linebreaks }}</span>
+        </div>
+      {% endif %}
+  
+      {% if s.procedure_description %}
+        <div class="step-inline">
+          <span class="step-inline-label"><b>Опис процедур:</b></span>
+          <span class="step-inline-body">{{ s.procedure_description|linebreaks }}</span>
+        </div>
+      {% endif %}
+  
+      {% if s.expected_result %}
+        <div class="step-inline step-inline--result">
+          <span class="step-inline-label"><b>Очікуваний результат:</b></span>
+          <span class="step-inline-body">{{ s.expected_result|linebreaks }}</span>
+        </div>
+      {% endif %}
+  
+      {# дальше твои кнопки/документы подшага добавим позже #}
+  
     </div>
   {% endfor %}
-</div>
-{# Кнопки-действия шага (пока только отображение) #}
-{% with actions=step.actions.all %}
-  {% if actions %}
-    <div style="margin: 14px 0 18px;">
-      <h4 style="margin:0 0 10px;">Дії для кроку</h4>
+  
+  </div>
 
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        {% for a in actions %}
-          {% if a.enabled and a.scope == "step" %}
-            <div style="display:flex; gap:12px; align-items:flex-start;">
-              <button type="button" class="btn btn-primary" style="min-width: 220px;">
-                {{ a.label }}
-              </button>
-              <div style="color:#6b7280; padding-top:6px;">
-                {{ a.description }}
+  {# Кнопки-действия шага (пока только отображение) #}
+  {% with actions=step.actions.all %}
+    {% if actions %}
+      <div class="audit-actions">
+        <h4 class="audit-actions__title">Дії для кроку</h4>
+
+        <div class="audit-actions__list">
+          {% for a in actions %}
+            {% if a.enabled and a.scope == "step" %}
+              <div class="audit-action">
+                <button type="button" class="btn btn-primary audit-action__btn">
+                  {{ a.label }}
+                </button>
+                <div class="audit-action__desc">{{ a.description }}</div>
               </div>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
+            {% endif %}
+          {% endfor %}
+        </div>
 
-      <div style="margin-top:8px; color:#6b7280; font-size:12px;">
-        Примітка: виконання кнопок (POST + перевірка ролей) підключимо наступним кроком. Зараз це лише відображення з адмінки.
+        <div class="audit-actions__note">
+          Примітка: виконання кнопок (POST + перевірка ролей). Зараз це лише відображення з адмінки.
+        </div>
       </div>
-    </div>
-  {% endif %}
-{% endwith %}
-{% if selected_client %}
-  <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-    <h4 style="margin:0 0 10px;">Документи кроку</h4>
+    {% endif %}
+  {% endwith %}
+
+  {# Документы шага #}
+  <div class="audit-docs">
+    <h4 class="audit-docs__title">Додоткові документи кроку</h4>
 
     <form method="post" enctype="multipart/form-data"
           action="{% url 'documents' %}?client_id={{ selected_client.id }}"
-          style="display:flex; gap:10px; align-items:center;">
+          class="audit-docs__form">
       {% csrf_token %}
-
       <input type="hidden" name="action" value="upload">
       <input type="hidden" name="doc_type" value="procedure">
       <input type="hidden" name="label" value="Step {{ step.order }} / Крок {{ step.order }}">
-
       <input type="file" name="file" required>
-
-      <button type="submit" class="btn btn-secondary">
-        Додати документ
-      </button>
+      <button type="submit" class="btn btn-secondary">Додати документ</button>
     </form>
   </div>
+
+  <script>
+  (function () {
+    const stepper = document.getElementById('subStepper');
+    if (!stepper) return;
+
+    const steps = stepper.querySelectorAll('.aap-step');
+    const panels = document.querySelectorAll('.aap-step-panel');
+
+    function openPanel(code) {
+      steps.forEach(s => s.classList.remove('is-active'));
+      panels.forEach(p => p.classList.remove('is-open'));
+
+      const activeStep = stepper.querySelector(`.aap-step[data-code="${code}"]`);
+      const activePanel = document.getElementById(`panel-${code}`);
+
+      if (activeStep) activeStep.classList.add('is-active');
+      if (activePanel) activePanel.classList.add('is-open');
+    }
+
+    steps.forEach(s => {
+      s.addEventListener('click', () => openPanel(s.dataset.code));
+      s.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') openPanel(s.dataset.code);
+      });
+    });
+
+    const first = steps[0] ? steps[0].dataset.code : null;
+    if (first) openPanel(first);
+  })();
+  </script>
+
 {% endif %}
 
-<script>
-(function () {
-  const stepper = document.getElementById('subStepper');
-  if (!stepper) return;
-
-  const steps = stepper.querySelectorAll('.aap-step');
-  const panels = document.querySelectorAll('.aap-step-panel');
-
-  function openPanel(code) {
-    steps.forEach(s => s.classList.remove('is-active'));
-    panels.forEach(p => p.classList.remove('is-open'));
-
-    const activeStep = stepper.querySelector(`.aap-step[data-code="${code}"]`);
-    const activePanel = document.getElementById(`panel-${code}`);
-
-    if (activeStep) activeStep.classList.add('is-active');
-    if (activePanel) activePanel.classList.add('is-open');
-  }
-
-  steps.forEach(s => {
-    s.addEventListener('click', () => openPanel(s.dataset.code));
-    s.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') openPanel(s.dataset.code);
-    });
-  });
-
-  const first = steps[0] ? steps[0].dataset.code : null;
-  if (first) openPanel(first);
-})();
-</script>
-
 {% endblock %}
+
