@@ -2,9 +2,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 import json
 import os
+import re
 
 from collections import defaultdict
-
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -17,16 +17,16 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date 
 from django.views.decorators.http import require_POST
 from docx import Document
-
 from .forms import ClientForm
 from .models import Client, ClientDocument, News, AuditStep, AuditSubStep, StepAction
 from .decorators import is_manager, manager_required
-
 from django.contrib import messages
 from .utils import require_active_client
-
-
 from .models import ProcedureFile
+import io, zipfile
+from django.http import HttpResponse, JsonResponse
+
+
 
 # ---------- CONSTANTS / HELPERS ----------
 
@@ -740,6 +740,8 @@ def requests_view(request):
 # ---------- ДОКУМЕНТЫ ----------
 
 
+
+
 @login_required
 def documents_view(request):
     user = request.user
@@ -779,26 +781,14 @@ def documents_view(request):
     client_id = request.GET.get("client_id") or request.session.get("active_client_id")
     selected_client = clients.filter(id=client_id).first() if client_id else None
 
-    # загрузка файла
+    # БЛОКИРУЕМ загрузку из "Базы документов"
     if request.method == "POST" and request.POST.get("action") == "upload":
-        if selected_client:
-            file = request.FILES.get("file")
-            if file:
-                ClientDocument.objects.create(
-                    organization=request.organization,
-                    client=selected_client,
-                    file=file,
-                    original_name=file.name,
-                    uploaded_by=request.user,
-                    doc_type=request.POST.get("doc_type") or "",
-                    custom_label=request.POST.get("label") or "",
-                )
+        return HttpResponseForbidden(
+            "Завантаження документів з 'Бази документів' тимчасово вимкнено. "
+            "Будь ласка, додавайте документи через відповідні кроки аудиту."
+        )
 
-        docs_url = reverse("documents")
-        if selected_client:
-            return redirect(f"{docs_url}?client_id={selected_client.id}")
-        return redirect(docs_url)
-
+    # список документов
     if selected_client:
         documents = (
             ClientDocument.objects.filter(
@@ -821,6 +811,7 @@ def documents_view(request):
             "clients_json": clients_json,
         },
     )
+
 
 
 @login_required
@@ -1267,3 +1258,44 @@ def audit_step_action_run(request, step_order: int, key: str):
 
     messages.success(request, f"Дію виконано: {action.label}")
     return redirect("audit_step", step_order=step_order)
+
+@require_POST
+@login_required
+def documents_download_zip(request):
+    client_id = request.POST.get("client_id") or request.session.get("active_client_id")
+    if not client_id:
+        return JsonResponse({"error": "No active client"}, status=400)
+
+    ids_raw = request.POST.get("doc_ids", "")
+    doc_ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    if not doc_ids:
+        return JsonResponse({"error": "No documents selected"}, status=400)
+
+    qs = ClientDocument.objects.filter(
+        organization=request.organization,
+        client_id=client_id,
+        id__in=doc_ids,
+    ).select_related("client")
+
+    # === НАЗВАНИЕ ZIP ПО ИМЕНИ КЛИЕНТА ===
+    client = qs.first().client
+    raw_name = client.name or "documents"
+
+    # убираем кавычки и всё опасное для файлов
+    safe_name = re.sub(r'[\"\'<>:/\\|?*]', "", raw_name)
+    safe_name = safe_name.strip().replace("  ", " ")
+
+    zip_name = f"{safe_name}.zip"
+
+    # === СОЗДАНИЕ ZIP ===
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for d in qs:
+            filename = d.original_name or f"doc_{d.id}"
+            with d.file.open("rb") as f:
+                z.writestr(filename, f.read())
+
+    buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type="application/zip")
+    resp["Content-Disposition"] = f'attachment; filename="{zip_name}"'
+    return resp

@@ -35,7 +35,7 @@ urlpatterns = [
     path("client/step-1/", views.client_step_1, name="client_step_1"),
     path("client/step-2/", views.client_step_2, name="client_step_2"),
     path("procedure-file/<int:pk>/delete/", views.procedure_file_delete, name="procedure_file_delete"),
-
+    path('documents/download/', views.documents_download_zip, name='documents_download_zip'),
 
 ]
 
