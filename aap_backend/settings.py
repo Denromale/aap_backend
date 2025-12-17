@@ -193,3 +193,15 @@ LOGIN_REDIRECT_URL = "dashboard" # соответствует path("dashboard/",
 
 # куда отправлять ПОСЛЕ выхода из системы
 LOGOUT_REDIRECT_URL = "login"
+
+# ===== CSRF / HTTPS FIX FOR RENDER =====
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://aap-backend.onrender.com",
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
