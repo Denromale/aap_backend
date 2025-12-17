@@ -704,4 +704,180 @@ html, body {
   details[open] > summary.sidebar-link.sidebar-summary .sidebar-summary-arrow {
     transform: rotate(90deg);
   }
+/* ===== Step 1.5: узкий select + кнопка справа (видна только выбранному пользователю) ===== */
+
+.team-row { margin-bottom: 10px; }
+
+.team-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.team-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* Уменьшаем ширину select только в блоке 1.5 */
+.team-control select {
+  width: 320px;
+  max-width: 100%;
+}
+
+/* Кнопка справа не переносится */
+.team-btn {
+  white-space: nowrap;
+}
+/* ===== Step 1.5 layout: fixed select width + button on the right ===== */
+.team-row { margin-bottom: 10px; }
+
+.team-control{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:nowrap;
+}
+
+.team-select-wrap{
+  width:320px;
+  flex:0 0 320px;
+  max-width:100%;
+}
+
+/* пробиваем глобальное select{width:100%} */
+.team-select-wrap select{
+  width:100% !important;
+}
+
+.team-btn{
+  white-space:nowrap;
+}
+/* ===== Step 1.5 team layout: короткий select + кнопка справа ===== */
+
+.team-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  /* одна строка: слева select, справа кнопка */
+  .team-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  
+  /* левый столбец */
+  .team-col {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* делаем select реально коротким (вместо width:100% из глобального css) */
+  .team-col select {
+    width: 340px !important;      /* <- это и есть "в 4 раза короче" */
+    max-width: 340px !important;
+  }
+  
+  /* правый столбец под кнопку */
+  .team-col-btn {
+    min-width: 320px; /* чтобы кнопка не прыгала */
+  }
+  
+  /* сама кнопка справа */
+  .team-side-btn {
+    white-space: nowrap;
+    height: 34px;
+    margin-bottom: 1px;
+  }
+  
+  /* адаптив: на маленьких экранах в столбик */
+  @media (max-width: 900px) {
+    .team-row {
+      flex-wrap: wrap;
+    }
+    .team-col select {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .team-col-btn {
+      min-width: 0;
+    }
+  }
+/* ===============================
+   TEAM FORM (Step 1.5) layout
+   =============================== */
+
+   .team-form {
+    margin-top: 6px;
+  }
+  
+  .team-row {
+    display: grid;
+    grid-template-columns: 180px 320px 260px; /* роль | select (короткий) | кнопка справа */
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .team-role {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  .team-required {
+    color: #dc2626;
+    font-weight: 800;
+  }
+  
+  .team-select-col {
+    max-width: 320px;            /* ключевое: делает поле в ~4 раза короче */
+  }
+  
+  .team-select-col select {
+    width: 100% !important;      /* внутри колонки занимает только 320px, не весь экран */
+  }
+  
+  .team-action-col {
+    min-height: 34px;
+    display: flex;
+    justify-content: flex-start;
+  }
+  
+  .team-right-btn {
+    width: 260px;                /* как на скрине — одинаковая ширина кнопок справа */
+    justify-content: center;
+  }
+  
+  /* Кнопки внизу — друг под другом */
+  .team-bottom-actions {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 320px;                /* чтобы блок был аккуратный и не растягивался */
+  }
+  
+  /* Адаптив: на узких экранах складываем в столбик */
+  @media (max-width: 900px) {
+    .team-row {
+      grid-template-columns: 1fr;
+    }
+  
+    .team-select-col {
+      max-width: 100%;
+    }
+  
+    .team-right-btn {
+      width: 100%;
+    }
+  
+    .team-bottom-actions {
+      width: 100%;
+    }
+  }
   

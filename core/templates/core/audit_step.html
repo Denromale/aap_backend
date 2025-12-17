@@ -1,5 +1,6 @@
 {% extends "core/base.html" %}
 {% load i18n %}
+{% load aap_extras %}
 
 {% block title %}
   КРОК {{ step.order }} – {{ step.title }}
@@ -9,8 +10,6 @@
 
 {# Верхний степпер 1–12 (кликабельный) #}
 <div class="aap-stepper aap-stepper--top">
-  {% for n in "123456789101112"|make_list %}
-  {% endfor %}
   <a class="aap-step aap-step--idle {% if step.order == 1 %}is-active{% endif %}" href="{% url 'audit_step' 1 %}">1</a>
   <div class="aap-step-line"></div>
   <a class="aap-step aap-step--idle {% if step.order == 2 %}is-active{% endif %}" href="{% url 'audit_step' 2 %}">2</a>
@@ -41,36 +40,28 @@
 {% if step.purpose %}
 <div class="step-inline">
   <span class="step-inline-label">Мета:</span>
-  <span class="step-inline-body">
-    {{ step.purpose|linebreaks }}
-  </span>
+  <span class="step-inline-body">{{ step.purpose|linebreaks }}</span>
 </div>
 {% endif %}
 
 {% if step.documentation %}
 <div class="step-inline">
   <span class="step-inline-label">Документування:</span>
-  <span class="step-inline-body">
-    {{ step.documentation|linebreaks }}
-  </span>
+  <span class="step-inline-body">{{ step.documentation|linebreaks }}</span>
 </div>
 {% endif %}
 
 {% if step.procedure_description %}
 <div class="step-inline">
   <span class="step-inline-label">Опис процедур:</span>
-  <span class="step-inline-body">
-    {{ step.procedure_description|linebreaks }}
-  </span>
+  <span class="step-inline-body">{{ step.procedure_description|linebreaks }}</span>
 </div>
 {% endif %}
 
 {% if step.expected_result %}
 <div class="step-inline step-inline--result">
   <span class="step-inline-label">Очікуваний результат:</span>
-  <span class="step-inline-body">
-    {{ step.expected_result|linebreaks }}
-  </span>
+  <span class="step-inline-body">{{ step.expected_result|linebreaks }}</span>
 </div>
 {% endif %}
 
@@ -94,87 +85,251 @@
 
   <div class="aap-step-panels" id="subPanels">
     {% for s in substeps %}
-    <div class="aap-step-panel {% if forloop.first %}is-open{% endif %}" id="panel-{{ s.id }}">
-  
-      <h4 style="margin:0 0 8px;">{{ step.order }}.{{ s.order }} {{ s.title }}</h4>
-  
-      {# --- 4 блока подшага: как в зеленом --- #}
-  
-      {% if s.purpose %}
-        <div class="step-inline">
-          <span class="step-inline-label"><b>Мета:</b></span>
-          <span class="step-inline-body">{{ s.purpose|linebreaks }}</span>
-        </div>
-      {% endif %}
-  
-      {% if s.documentation %}
-        <div class="step-inline">
-          <span class="step-inline-label"><b>Документування:</b></span>
-          <span class="step-inline-body">{{ s.documentation|linebreaks }}</span>
-        </div>
-      {% endif %}
-  
-      {% if s.procedure_description %}
-        <div class="step-inline">
-          <span class="step-inline-label"><b>Опис процедур:</b></span>
-          <span class="step-inline-body">{{ s.procedure_description|linebreaks }}</span>
-        </div>
-      {% endif %}
-  
-      {% if s.expected_result %}
-        <div class="step-inline step-inline--result">
-          <span class="step-inline-label"><b>Очікуваний результат:</b></span>
-          <span class="step-inline-body">{{ s.expected_result|linebreaks }}</span>
-        </div>
-      {% endif %}
-  
-      {# дальше твои кнопки/документы подшага добавим позже #}
-  
-    </div>
-  {% endfor %}
-  
-  </div>
+      <div class="aap-step-panel {% if forloop.first %}is-open{% endif %}" id="panel-{{ s.id }}">
 
-  {# Кнопки-действия шага (пока только отображение) #}
-  {% with actions=step.actions.all %}
-    {% if actions %}
-      <div class="audit-actions">
-        <h4 class="audit-actions__title">Дії для кроку</h4>
+        <h4 style="margin:0 0 8px;">{{ step.order }}.{{ s.order }} {{ s.title }}</h4>
 
-        <div class="audit-actions__list">
-          {% for a in actions %}
-            {% if a.enabled and a.scope == "step" %}
-              <div class="audit-action">
-                <button type="button" class="btn btn-primary audit-action__btn">
-                  {{ a.label }}
-                </button>
-                <div class="audit-action__desc">{{ a.description }}</div>
+        {% if s.purpose %}
+          <div class="step-inline">
+            <span class="step-inline-label"><b>Мета:</b></span>
+            <span class="step-inline-body">{{ s.purpose|linebreaks }}</span>
+          </div>
+        {% endif %}
+
+        {% if s.documentation %}
+          <div class="step-inline">
+            <span class="step-inline-label"><b>Документування:</b></span>
+            <span class="step-inline-body">{{ s.documentation|linebreaks }}</span>
+          </div>
+        {% endif %}
+
+        {% if s.procedure_description %}
+          <div class="step-inline">
+            <span class="step-inline-label"><b>Опис процедур:</b></span>
+            <span class="step-inline-body">{{ s.procedure_description|linebreaks }}</span>
+          </div>
+        {% endif %}
+
+        {% if s.expected_result %}
+          <div class="step-inline step-inline--result">
+            <span class="step-inline-label"><b>Очікуваний результат:</b></span>
+            <span class="step-inline-body">{{ s.expected_result|linebreaks }}</span>
+          </div>
+        {% endif %}
+
+        {# ===== Step 1.5: форма команди (селект короткий + кнопка справа) ===== #}
+        {# ===== Step 1.5: форма команди (ТОЛЬКО ТУТ и ТОЛЬКО ВНИЗУ) ===== #}
+        {% if step.order == 1 and s.order == 5 %}
+          <hr style="margin:14px 0;">
+          <h4 style="margin:0 0 10px;">Формування команди</h4>
+        
+          {% if not can_manage_step15 %}
+            <div class="audit-hint">
+              Немає прав змінювати команду на кроці 1.5.
+            </div>
+          {% else %}
+            <form method="post" novalidate class="team-form">
+              {% csrf_token %}
+              <input type="hidden" name="form_name" value="step15_team">
+        
+              {% if team_form.non_field_errors %}
+                <div class="field-error">{{ team_form.non_field_errors }}</div>
+              {% endif %}
+        
+              {# ===== РЯДОК: Менеджер ===== #}
+              <div class="team-row">
+                <div class="team-role">
+                  Менеджер <span class="team-required">*</span>
+                  {% if team_form.manager.errors %}
+                    <div class="field-error">{{ team_form.manager.errors }}</div>
+                  {% endif %}
+                </div>
+        
+                <div class="team-select-col">
+                  {{ team_form.manager }}
+                </div>
+        
+                <div class="team-action-col">
+                  {# кнопка справа показывается только если выбран пользователь и это текущий user #}
+                  {% if team_form.manager.value and team_form.manager.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
               </div>
-            {% endif %}
-          {% endfor %}
+        
+              {# ===== РЯДОК: Менеджер КК ===== #}
+              <div class="team-row">
+                <div class="team-role">
+                  Менеджер КК <span class="team-required">*</span>
+                  {% if team_form.qa_manager.errors %}
+                    <div class="field-error">{{ team_form.qa_manager.errors }}</div>
+                  {% endif %}
+                </div>
+        
+                <div class="team-select-col">
+                  {{ team_form.qa_manager }}
+                </div>
+        
+                <div class="team-action-col">
+                  {% if team_form.qa_manager.value and team_form.qa_manager.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Аудитор 1 ===== #}
+              <div class="team-row">
+                <div class="team-role">Аудитор 1</div>
+                <div class="team-select-col">{{ team_form.auditor }}</div>
+                <div class="team-action-col">
+                  {% if team_form.auditor.value and team_form.auditor.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Аудитор 2 ===== #}
+              <div class="team-row">
+                <div class="team-role">Аудитор 2</div>
+                <div class="team-select-col">{{ team_form.auditor2 }}</div>
+                <div class="team-action-col">
+                  {% if team_form.auditor2.value and team_form.auditor2.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Аудитор 3 ===== #}
+              <div class="team-row">
+                <div class="team-role">Аудитор 3</div>
+                <div class="team-select-col">{{ team_form.auditor3 }}</div>
+                <div class="team-action-col">
+                  {% if team_form.auditor3.value and team_form.auditor3.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Асистент 1 ===== #}
+              <div class="team-row">
+                <div class="team-role">Асистент 1</div>
+                <div class="team-select-col">{{ team_form.assistant }}</div>
+                <div class="team-action-col">
+                  {% if team_form.assistant.value and team_form.assistant.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Асистент 2 ===== #}
+              <div class="team-row">
+                <div class="team-role">Асистент 2</div>
+                <div class="team-select-col">{{ team_form.assistant2 }}</div>
+                <div class="team-action-col">
+                  {% if team_form.assistant2.value and team_form.assistant2.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Асистент 3 ===== #}
+              <div class="team-row">
+                <div class="team-role">Асистент 3</div>
+                <div class="team-select-col">{{ team_form.assistant3 }}</div>
+                <div class="team-action-col">
+                  {% if team_form.assistant3.value and team_form.assistant3.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== РЯДОК: Асистент 4 ===== #}
+              <div class="team-row">
+                <div class="team-role">Асистент 4</div>
+                <div class="team-select-col">{{ team_form.assistant4 }}</div>
+                <div class="team-action-col">
+                  {% if team_form.assistant4.value and team_form.assistant4.value|stringformat:"s" == request.user.id|stringformat:"s" %}
+                    <button type="button" class="btn btn-secondary team-right-btn">
+                      Анкета незалежності
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+        
+              {# ===== КНОПКИ ВНИЗУ (друг под другом как на твоём 1-м фото) ===== #}
+              <div class="team-bottom-actions">
+                <button type="submit" class="btn btn-primary" name="action" value="save_team">
+                  Зберегти команду
+                </button>
+        
+                <button type="submit" class="btn btn-secondary" name="action" value="generate_request">
+                  Розпорядження на призначення команди
+                </button>
+        
+                {# "Памʼятка" — пока как UI-кнопка. Потом привяжем к действию/документу #}
+                <button type="button" class="btn btn-secondary">
+                  Памʼятка
+                </button>
+              </div>
+            </form>
+          {% endif %}
+        {% endif %}
+        
+
+        {# ===== ДІЇ РІВНЯ ПІДКРОКУ (кнопки внизу підкроку) ===== #}
+        {% with actions_list=substep_actions_map|get_item:s.id %}
+          {% if actions_list %}
+            <div class="audit-actions" style="margin-top: 14px;">
+              <h4 class="audit-actions__title">Дії для підкроку</h4>
+              <div class="audit-actions__list">
+                {% for a in actions_list %}
+                  <div class="audit-action">
+                    <button type="button" class="btn btn-primary audit-action__btn" disabled title="Поки що без виконання">
+                      {{ a.label }}
+                    </button>
+                    {% if a.description %}
+                      <div class="audit-action__desc">{{ a.description }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {# ===== ДОКУМЕНТИ: завжди останній блок підкроку ===== #}
+        <div class="audit-docs" style="margin-top: 14px;">
+          <h4 class="audit-docs__title">Додаткові документи підкроку</h4>
+
+          <div class="audit-actions__note" style="margin-top:6px;">
+            Завантаження з «Бази документів» тимчасово вимкнено (інакше буде 403).
+            Документи додаються через відповідні дії/кнопки цього кроку.
+          </div>
+
+          <form class="audit-docs__form" style="opacity:.6; pointer-events:none;">
+            <input type="file" name="file" disabled>
+            <button type="button" class="btn btn-secondary" disabled>Додати документ</button>
+          </form>
         </div>
 
-        <div class="audit-actions__note">
-          Примітка: виконання кнопок (POST + перевірка ролей). Зараз це лише відображення з адмінки.
-        </div>
       </div>
-    {% endif %}
-  {% endwith %}
-
-  {# Документы шага #}
-  <div class="audit-docs">
-    <h4 class="audit-docs__title">Додоткові документи кроку</h4>
-
-    <form method="post" enctype="multipart/form-data"
-          action="{% url 'documents' %}?client_id={{ selected_client.id }}"
-          class="audit-docs__form">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="upload">
-      <input type="hidden" name="doc_type" value="procedure">
-      <input type="hidden" name="label" value="Step {{ step.order }} / Крок {{ step.order }}">
-      <input type="file" name="file" required>
-      <button type="submit" class="btn btn-secondary">Додати документ</button>
-    </form>
+    {% endfor %}
   </div>
 
   <script>
@@ -209,6 +364,4 @@
   </script>
 
 {% endif %}
-
 {% endblock %}
-
