@@ -3,6 +3,8 @@ from io import BytesIO
 import json
 import os
 import re
+import io, zipfile, re, urllib.parse
+import urllib.parse
 
 from collections import defaultdict
 from django.conf import settings
@@ -17,14 +19,32 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date 
 from django.views.decorators.http import require_POST
 from docx import Document
-from .forms import ClientForm
+
 from .models import Client, ClientDocument, News, AuditStep, AuditSubStep, StepAction
 from .decorators import is_manager, manager_required
 from django.contrib import messages
 from .utils import require_active_client
 from .models import ProcedureFile
-import io, zipfile
-from django.http import HttpResponse, JsonResponse
+
+from django.http import JsonResponse
+from .forms import ClientForm, Step15TeamForm
+from django.http import HttpResponse
+
+from django.http import FileResponse, Http404
+from django.utils.text import get_valid_filename
+
+
+import io
+import re
+import zipfile
+import urllib.parse
+
+from django.http import HttpResponse
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 
 
 
@@ -41,6 +61,14 @@ TEAM_ROLE_FIELDS = (
     "assistant4",
     "qa_manager",
 )
+
+def can_manage_step15(user, client) -> bool:
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser or is_manager(user):
+        return True
+    # пока команда не сформирована полностью — допускаем менеджера/КК менеджера
+    return user == client.manager or user == client.qa_manager
 
 
 def build_team_q(user) -> Q:
@@ -427,7 +455,18 @@ def client_create(request):
         if form.is_valid():
             client = form.save(commit=False)
             client.organization = request.organization
-            client.save()  # логика синхронизации команды уже срабатывает внутри модели/сигнала
+
+            # SERVER IGNORE (CREATE):
+            # На этапе "Додати клієнта" разрешаем только manager + qa_manager.
+            # Всё остальное (аудиторы/ассистенты) обнуляем даже если пришло в POST.
+            for fname in (
+                "auditor", "auditor2", "auditor3",
+                "assistant", "assistant2", "assistant3", "assistant4",
+            ):
+                if hasattr(client, fname):
+                    setattr(client, fname, None)
+
+            client.save()  # логика синхронизации команды (если есть) сработает уже на чистых полях
 
             # --- ищем "соседние" проекты с тем же договором ---
             siblings = Client.objects.filter(
@@ -494,6 +533,7 @@ def client_create(request):
     return render(request, "core/client_form.html", {"form": form})
 
 
+
 @login_required
 def client_detail(request, pk):
     # клиент берётся только из списка доступных пользователю проектов
@@ -534,20 +574,28 @@ def client_edit(request, pk):
     if request.method == "POST":
         form = ClientForm(request.POST, request.FILES, instance=client)
         if form.is_valid():
-        # важно: form.save() сам корректно сохраняет FileField audit_report_scan,
-        # и НЕ трогает contract_scan (он не в Meta.fields)
-            client = form.save(commit=False)
-            client.organization = request.organization
-            client.save()
-            # form.save_m2m() не нужен (у тебя нет m2m), но можно оставить как привычку:
-            # form.save_m2m()
+            updated = form.save(commit=False)
+            updated.organization = request.organization
+
+            # SERVER IGNORE (EDIT):
+            # Через client_edit мы НЕ меняем аудиторов/ассистентов.
+            # Сохраняем текущие значения из БД, даже если кто-то подложил POST.
+            locked_team_fields = (
+                "auditor", "auditor2", "auditor3",
+                "assistant", "assistant2", "assistant3", "assistant4",
+            )
+            for fname in locked_team_fields:
+                if hasattr(updated, fname):
+                    setattr(updated, fname, getattr(client, fname))
+
+            updated.save()
 
             # ---- работа со сканом договора (как в create) ----
             file = request.FILES.get("contract_scan")
             if file:
                 base_doc = ClientDocument.objects.create(
                     organization=request.organization,
-                    client=client,
+                    client=updated,
                     file=file,
                     doc_type="agreement",
                     original_name=file.name,
@@ -557,10 +605,10 @@ def client_edit(request, pk):
 
                 siblings = Client.objects.filter(
                     organization=request.organization,
-                    name=client.name,
-                    requisites_number=client.requisites_number,
-                    requisites_date=client.requisites_date,
-                ).exclude(pk=client.pk)
+                    name=updated.name,
+                    requisites_number=updated.requisites_number,
+                    requisites_date=updated.requisites_date,
+                ).exclude(pk=updated.pk)
 
                 for other in siblings:
                     ClientDocument.objects.create(
@@ -573,9 +621,10 @@ def client_edit(request, pk):
                         uploaded_by=request.user,
                     )
 
-            return redirect("client_detail", pk=client.pk)
+            return redirect("client_detail", pk=updated.pk)
     else:
-         form = ClientForm(instance=client)
+        form = ClientForm(instance=client)
+
     can_complete = bool(client.audit_report_scan) and bool(client.cw_controls_done)
 
     return render(
@@ -585,22 +634,10 @@ def client_edit(request, pk):
             "form": form,
             "edit": True,
             "client": client,
-            "is_manager": is_manager(request.user),  # у тебя уже есть is_manager()
+            "is_manager": is_manager(request.user),
             "can_complete": can_complete,
         },
     )
-
-
-    return render(
-    request,
-    "core/client_form.html",
-    {
-        "form": form,
-        "edit": True,
-        "client": client,
-        "is_manager": is_manager(request.user),
-    },
-)
 
 
 
@@ -812,6 +849,35 @@ def documents_view(request):
         },
     )
 
+@login_required
+def document_download(request, doc_id: int):
+    doc = get_object_or_404(
+        ClientDocument,
+        pk=doc_id,
+        organization=request.organization,
+    )
+
+    client = doc.client
+
+    # доступ: суперюзер/менеджер или участник команды
+    if not (request.user.is_superuser or is_manager(request.user) or user_in_client_team(request.user, client)):
+        return HttpResponseForbidden("Немає прав на завантаження цього документа.")
+
+    if not doc.file:
+        raise Http404("Файл відсутній.")
+
+    # безопасное имя файла
+    filename = doc.original_name or f"document_{doc.id}"
+    filename = filename.strip() or f"document_{doc.id}"
+    filename = get_valid_filename(filename)
+
+    try:
+        f = doc.file.open("rb")
+    except Exception:
+        # если файл реально отсутствует в текущем storage (как у тебя на локалке)
+        raise Http404("Файл не знайдено у сховищі.")
+
+    return FileResponse(f, as_attachment=True, filename=filename)
 
 
 @login_required
@@ -838,14 +904,81 @@ def document_update_type(request, doc_id):
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client.id}")
 
+@login_required
+@require_POST
+def procedure_file_upload(request):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    substep_id = request.POST.get("substep_id")
+    if not substep_id:
+        messages.error(request, "Не обрано підкрок для завантаження.")
+        return redirect(reverse("audit_step", args=[1]))
+
+    substep = get_object_or_404(AuditSubStep, pk=substep_id)
+
+    uploaded_file = request.FILES.get("file")
+    if not uploaded_file:
+        messages.error(request, "Файл не обрано.")
+        return redirect(reverse("audit_step", args=[substep.step.order]) + f"?open={substep.id}")
+
+    max_size = 20 * 1024 * 1024
+    if uploaded_file.size > max_size:
+        messages.error(request, "Файл завеликий (макс 20MB).")
+        return redirect(reverse("audit_step", args=[substep.step.order]) + f"?open={substep.id}")
+
+    # 1) сохраняем как ProcedureFile (для отображения на шаге)
+    pf = ProcedureFile.objects.create(
+        client=client,
+        procedure_code=str(substep.id),
+        file=uploaded_file,
+        uploaded_by=request.user,
+        title=uploaded_file.name,
+    )
+
+    # 2) создаём запись в "База документів" (ClientDocument)
+    # Метка шага/подшага пишем в custom_label
+    step_label = f"Step {substep.step.order}.{substep.order}"
+
+    doc = ClientDocument.objects.create(
+        organization=request.organization,
+        client=client,
+        original_name=uploaded_file.name,
+        doc_type="other",
+        custom_label=step_label,
+        uploaded_by=request.user,
+    )
+
+    # ✅ ВАЖНО: не копируем файл, а ССЫЛАЕМСЯ на уже сохранённый pf.file
+    # (иначе будет 404 по /media/client_docs/..., и ZIP будет пустой)
+    doc.file.name = pf.file.name
+    doc.save(update_fields=["file"])
+
+    # 3) НЕ редиректим, если это ajax (остаёмся на той же странице)
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+    if is_ajax:
+        return JsonResponse({
+            "ok": True,
+            "message": "Файл успішно завантажено.",
+            "substep_id": substep.id,
+            "step_order": substep.step.order,
+            "file": {
+                "id": pf.id,
+                "name": uploaded_file.name,
+                "created_at": pf.created_at.isoformat(),
+            },
+            "doc_label": step_label,
+        })
+
+    messages.success(request, "Файл успішно завантажено.")
+    return redirect(reverse("audit_step", args=[substep.step.order]) + f"?open={substep.id}")
+
+
+
 
 @login_required
 def document_delete(request, pk):
-    """
-    Удаление документа клиента:
-    - удаляет файл с диска
-    - удаляет запись из базы
-    """
     doc = get_object_or_404(
         ClientDocument,
         pk=pk,
@@ -858,12 +991,32 @@ def document_delete(request, pk):
         return redirect(f"{documents_url}?client_id={client_id}")
 
     if request.method == "POST":
-        if doc.file:
-            doc.file.delete(save=False)
-        doc.delete()
+        # Пытаемся найти ProcedureFile, который ссылается на тот же объект в storage
+        file_name = doc.file.name if doc.file else ""
+
+        if file_name:
+            pfs = ProcedureFile.objects.filter(client_id=client_id, file=file_name)
+
+            if pfs.exists():
+                # Удаляем связанный ProcedureFile (и физический файл) один раз
+                for pf in pfs:
+                    if pf.file:
+                        pf.file.delete(save=False)
+                    pf.delete()
+
+                # Теперь удаляем только запись ClientDocument (файл уже удалён)
+                doc.delete()
+            else:
+                # Если ProcedureFile не найден — удаляем как раньше
+                if doc.file:
+                    doc.file.delete(save=False)
+                doc.delete()
+        else:
+            doc.delete()
 
     documents_url = reverse("documents")
     return redirect(f"{documents_url}?client_id={client_id}")
+
 
 
 
@@ -1169,15 +1322,25 @@ def procedure_file_delete(request, pk):
     )
 
     code = f.procedure_code
+    file_name = f.file.name if f.file else ""
 
     # удалить сам файл из хранилища
     if f.file:
         f.file.delete(save=False)
 
-    # удалить запись
+    # удалить запись ProcedureFile
     f.delete()
 
+    # ✅ удалить связанный ClientDocument (если есть)
+    if file_name:
+        ClientDocument.objects.filter(
+            organization=request.organization,
+            client=client,
+            file=file_name,
+        ).delete()
+
     return redirect(reverse("client_step_1") + f"?open={code}")
+
 
 def action_allowed_for_user(action: StepAction, user, client) -> bool:
     if not user.is_authenticated:
@@ -1207,6 +1370,93 @@ def audit_step_view(request, step_order: int):
     step = get_object_or_404(AuditStep, order=step_order, is_active=True)
     substeps = AuditSubStep.objects.filter(step=step, is_active=True).order_by("order")
 
+    # --- Step 1.5 (order=5 внутри Step 1) ---
+    step15_substep = None
+    if step.order == 1:
+        step15_substep = substeps.filter(order=5).first()
+
+    team_form = None
+
+    # POST для Step 1.5: сохранить команду / сформировать запрос
+    if request.method == "POST" and request.POST.get("form_name") == "step15_team":
+        if not step15_substep:
+            return HttpResponseForbidden("Step 1.5 не налаштований.")
+        if not can_manage_step15(request.user, client):
+            return HttpResponseForbidden("Немає прав формувати команду на кроці 1.5.")
+
+        team_form = Step15TeamForm(request.POST, client=client)
+
+        if team_form.is_valid():
+            client.manager = team_form.cleaned_data["manager"]
+            client.qa_manager = team_form.cleaned_data["qa_manager"]
+            client.auditor = team_form.cleaned_data["auditor"]
+            client.auditor2 = team_form.cleaned_data["auditor2"]
+            client.auditor3 = team_form.cleaned_data["auditor3"]
+            client.assistant = team_form.cleaned_data["assistant"]
+            client.assistant2 = team_form.cleaned_data["assistant2"]
+            client.assistant3 = team_form.cleaned_data["assistant3"]
+            client.assistant4 = team_form.cleaned_data["assistant4"]
+            client.save()
+
+            if request.POST.get("action") == "generate_request":
+                doc = Document()
+                doc.add_heading("Формування команди та Етика (Step 1.5)", level=1)
+
+                doc.add_paragraph(f"Клієнт: {client.name or ''}")
+                doc.add_paragraph(f"Звітний період: {client.reporting_period or ''}")
+                doc.add_paragraph(f"Дата: {timezone.now().strftime('%d.%m.%Y')}")
+
+                def fn(u):
+                    if not u:
+                        return ""
+                    return u.get_full_name() or u.username
+
+                doc.add_heading("Команда", level=2)
+                doc.add_paragraph(f"Менеджер: {fn(client.manager)}")
+                doc.add_paragraph(f"Менеджер КК: {fn(client.qa_manager)}")
+                doc.add_paragraph(f"Аудитор 1: {fn(client.auditor)}")
+                doc.add_paragraph(f"Аудитор 2: {fn(client.auditor2)}")
+                doc.add_paragraph(f"Аудитор 3: {fn(client.auditor3)}")
+                doc.add_paragraph(f"Асистент 1: {fn(client.assistant)}")
+                doc.add_paragraph(f"Асистент 2: {fn(client.assistant2)}")
+                doc.add_paragraph(f"Асистент 3: {fn(client.assistant3)}")
+                doc.add_paragraph(f"Асистент 4: {fn(client.assistant4)}")
+
+                doc.add_heading("Етика / Незалежність", level=2)
+                doc.add_paragraph(
+                    "Підтвердження незалежності та дотримання етичних вимог "
+                    "(заповнюється/підписується відповідно до політик компанії)."
+                )
+
+                buf = BytesIO()
+                doc.save(buf)
+                buf.seek(0)
+
+                filename = f"step_1_5_team_ethics_{client.id}.docx"
+
+                ClientDocument.objects.create(
+                    organization=request.organization,
+                    client=client,
+                    uploaded_by=request.user,
+                    doc_type="request",
+                    original_name=filename,
+                    custom_label="Step 1 / 5",
+                    file=ContentFile(buf.getvalue(), name=filename),
+                )
+
+                # ВАЖНО: тут ты сейчас редиректишь в документы.
+                # Ты говорил про "не редиректим" именно для загрузок файлов.
+                # Этот редирект оставляю как было (если надо — уберём отдельно).
+                documents_url = reverse("documents")
+                return redirect(f"{documents_url}?client_id={client.id}")
+
+            messages.success(request, "Команду збережено (Step 1.5).")
+            return redirect("audit_step", step_order=step_order)
+
+    # если не POST Step 1.5 — показываем форму
+    if step15_substep and team_form is None:
+        team_form = Step15TeamForm(client=client)
+
     # действия уровня шага
     step_actions_qs = (
         step.actions
@@ -1227,14 +1477,32 @@ def audit_step_view(request, step_order: int):
         )
         substep_actions_map[s.id] = [a for a in qs if action_allowed_for_user(a, request.user, client)]
 
+    # файлы по подшагам
+    files_qs = ProcedureFile.objects.filter(client=client).order_by("-created_at")
+    substep_files_map = {}
+    for f in files_qs:
+        key = str(f.procedure_code)
+        substep_files_map.setdefault(key, []).append(f)
+
     context = {
         "selected_client": client,
         "step": step,
         "substeps": substeps,
         "step_actions": step_actions,
         "substep_actions_map": substep_actions_map,
+
+        # Step 1.5 extras
+        "team_form": team_form,
+        "step15_substep_id": step15_substep.id if step15_substep else None,
+        "can_manage_step15": can_manage_step15(request.user, client),
+
+        # files
+        "substep_files_map": substep_files_map,
     }
+
     return render(request, "core/audit_step.html", context)
+
+
 
 @login_required
 @require_POST
@@ -1259,43 +1527,93 @@ def audit_step_action_run(request, step_order: int, key: str):
     messages.success(request, f"Дію виконано: {action.label}")
     return redirect("audit_step", step_order=step_order)
 
+import urllib.parse
+
+def _safe_zip_name(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return "documents"
+    # убираем недопустимые символы Windows/Linux + кавычки
+    raw = re.sub(r'[\"\'<>:/\\|?*\x00-\x1F]', "", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    raw = raw.strip(". ")  # нельзя заканчивать точкой/пробелом в Windows
+    if not raw:
+        return "documents"
+    return raw[:120]  # чтобы не упереться в лимиты
+
+
+
+def _safe_project_zip_name(name: str | None) -> str:
+    raw = (name or "documents").strip()
+    # убираем кавычки и недопустимые символы Windows/Linux
+    raw = re.sub(r'[\"\'<>:/\\|?*\x00-\x1F]', "", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw or "documents"
+
+
 @require_POST
 @login_required
 def documents_download_zip(request):
+    documents_url = reverse("documents")
+
     client_id = request.POST.get("client_id") or request.session.get("active_client_id")
     if not client_id:
-        return JsonResponse({"error": "No active client"}, status=400)
+        messages.error(request, "Не обрано проєкт для завантаження ZIP.")
+        return redirect(documents_url)
 
-    ids_raw = request.POST.get("doc_ids", "")
+    ids_raw = (request.POST.get("doc_ids") or "").strip()
     doc_ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
     if not doc_ids:
-        return JsonResponse({"error": "No documents selected"}, status=400)
+        messages.error(request, "Оберіть документи для завантаження.")
+        return redirect(f"{documents_url}?client_id={client_id}")
 
-    qs = ClientDocument.objects.filter(
-        organization=request.organization,
-        client_id=client_id,
-        id__in=doc_ids,
-    ).select_related("client")
+    qs = (
+        ClientDocument.objects.filter(
+            organization=request.organization,
+            client_id=client_id,
+            id__in=doc_ids,
+        )
+        .select_related("client")
+    )
 
-    # === НАЗВАНИЕ ZIP ПО ИМЕНИ КЛИЕНТА ===
-    client = qs.first().client
-    raw_name = client.name or "documents"
+    first = qs.first()
+    if not first:
+        messages.error(request, "Обрані документи не знайдено.")
+        return redirect(f"{documents_url}?client_id={client_id}")
 
-    # убираем кавычки и всё опасное для файлов
-    safe_name = re.sub(r'[\"\'<>:/\\|?*]', "", raw_name)
-    safe_name = safe_name.strip().replace("  ", " ")
+    client = first.client
+    zip_base = _safe_project_zip_name(client.name)  # эта функция должна быть у тебя
+    zip_name = f"{zip_base}.zip"
 
-    zip_name = f"{safe_name}.zip"
-
-    # === СОЗДАНИЕ ZIP ===
     buf = io.BytesIO()
+    added = 0
+
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for d in qs:
-            filename = d.original_name or f"doc_{d.id}"
-            with d.file.open("rb") as f:
-                z.writestr(filename, f.read())
+            if not d.file or not d.file.name:
+                continue
+
+            inner_name = (d.original_name or f"doc_{d.id}").strip() or f"doc_{d.id}"
+            inner_name = re.sub(r"[<>:/\\|?*\x00-\x1F]", "_", inner_name)
+
+            try:
+                # ✅ открываем через storage (важно для R2/S3)
+                with d.file.storage.open(d.file.name, "rb") as f:
+                    z.writestr(inner_name, f.read())
+                added += 1
+            except Exception as e:
+                print(f"[ZIP] Cannot add file {d.file.name}: {e}")
+                continue
+
+        # ✅ если реально ничего не добавили — добавляем README, чтобы zip не был "пустым"
+        if added == 0:
+            z.writestr("README.txt", "No files could be added to the archive.")
 
     buf.seek(0)
     resp = HttpResponse(buf.getvalue(), content_type="application/zip")
-    resp["Content-Disposition"] = f'attachment; filename="{zip_name}"'
+
+    # ✅ корректно для кириллицы
+    quoted = urllib.parse.quote(zip_name)
+    resp["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
+
     return resp
