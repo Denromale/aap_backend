@@ -1,5 +1,3 @@
-# core/forms.py
-
 import os
 import re
 
@@ -16,7 +14,6 @@ ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
 
 # Максимальный размер одного файла (МБ)
 MAX_CONTRACT_FILE_MB = 20
-
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -49,12 +46,11 @@ class ClientForm(forms.ModelForm):
         """
         files = self.files.getlist("contract_scan")
 
-        # если файлов нет — просто вернуть текущее значение (валидация required делается отдельно)
+        # если файлов нет — просто вернуть текущее значение
         if not files:
             return self.cleaned_data.get("contract_scan")
 
         for f in files:
-            # 1) проверка расширения
             ext = os.path.splitext(f.name)[1].lower()
             if ext not in ALLOWED_EXTENSIONS:
                 raise forms.ValidationError(
@@ -62,15 +58,13 @@ class ClientForm(forms.ModelForm):
                     params={"exts": ", ".join(sorted(ALLOWED_EXTENSIONS))},
                 )
 
-            # 2) проверка размера
             if f.size > MAX_CONTRACT_FILE_MB * 1024 * 1024:
                 raise forms.ValidationError(
                     _("Розмір кожного файлу не повинен перевищувати %(mb)s МБ."),
                     params={"mb": MAX_CONTRACT_FILE_MB},
                 )
 
-        # мы сами список не используем, поэтому просто возвращаем стандартное значение
-        return self.cleaned_data.get("contract_scan")   
+        return self.cleaned_data.get("contract_scan")
 
     requisites_date = forms.DateField(
         required=False,
@@ -194,12 +188,11 @@ class ClientForm(forms.ModelForm):
             "supervision_notice_date",
             "cw_controls_done",
             "audit_report_scan",
-            
 
             # Статус
             "status",
 
-            # Команда
+            # Команда (оставляем в форме, но аудиторы/ассистенты будут disabled + server ignore)
             "manager",
             "auditor",
             "auditor2",
@@ -226,7 +219,6 @@ class ClientForm(forms.ModelForm):
             "poi": forms.CheckboxInput(),
 
             "requisites_number": forms.TextInput(attrs={"class": "form-control"}),
-
             "requisites_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "requisites_vat": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
 
@@ -237,7 +229,6 @@ class ClientForm(forms.ModelForm):
             "mandatory_audit": forms.CheckboxInput(),
 
             "reporting_period": forms.TextInput(attrs={"class": "form-control"}),
-
             "engagement_subject": forms.Select(attrs={"class": "form-control"}),
 
             "authorized_person_name": forms.TextInput(attrs={"class": "form-control"}),
@@ -264,36 +255,58 @@ class ClientForm(forms.ModelForm):
 
             "qa_manager": forms.Select(attrs={"class": "form-control"}),
         }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # --- вспомогательная функция: добавить legacy-значение в choices ---
+        # --- вспомогательная функция: добавить legacy-значение в choices ---
         def ensure_legacy_choice(field_name: str, value: str):
             """
             Если в БД лежит значение, которого нет в choices,
             добавляем его как обычный option (value, value).
-
             Нужно только для старых проектов, чтобы селект мог его показать.
-        """
+            """
             if not value:
                 return
-
             field = self.fields.get(field_name)
             if not field:
                 return
 
             choices = list(field.choices)
-
-        # если такое значение уже есть — ничего не делаем
             if any(val == value for val, _ in choices):
                 return
 
-        # добавляем в начало списка, чтобы его можно было выбрать
             choices.insert(0, (value, value))
             field.choices = choices
 
+        # Фильтр пользователей: показываем только активных (не ломает старые значения в instance)
+        active_users = User.objects.filter(is_active=True)
+        for fname in [
+            "manager", "qa_manager",
+            "auditor", "auditor2", "auditor3",
+            "assistant", "assistant2", "assistant3", "assistant4",
+        ]:
+            if fname in self.fields:
+                self.fields[fname].queryset = active_users
 
-    # БАЗОВЫЙ список обязательных полей (как у тебя было)
+        # --- ТРЕБОВАНИЕ: аудиторы/ассистенты назначаются в Step 1.5 ---
+        self._team_disabled_fields = [
+            "auditor", "auditor2", "auditor3",
+            "assistant", "assistant2", "assistant3", "assistant4",
+        ]
+
+        # Можно держать disabled и при редактировании, чтобы не назначали "старым путем".
+        # Главное: на сервере НЕ затирать существующие значения.
+        for fname in self._team_disabled_fields:
+            if fname in self.fields:
+                f = self.fields[fname]
+                f.required = False
+                f.disabled = True
+                f.help_text = (f.help_text or "") + " Команда формується на кроці 1.5."
+                css = f.widget.attrs.get("class", "")
+                f.widget.attrs["class"] = (css + " is-disabled").strip()
+
+        # БАЗОВЫЙ список обязательных полей
         required_fields = [
             "name",
             "edrpou",
@@ -330,9 +343,8 @@ class ClientForm(forms.ModelForm):
             "qa_manager",
         ]
 
-    # если хочешь, чтобы скан был обязателен ТОЛЬКО при создании — раскомментируй:
-    # if not self.instance.pk:
-    #     required_fields.append("contract_scan")
+        # if not self.instance.pk:
+        #     required_fields.append("contract_scan")
 
         for field_name in required_fields:
             if field_name in self.fields:
@@ -341,17 +353,13 @@ class ClientForm(forms.ModelForm):
                 field.widget.attrs.pop("required", None)
                 css = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = (css + " required-input").strip()
-            # --- для существующего клиента подмешиваем старые значения, если нужно ---
+
+        # --- для существующего клиента подмешиваем старые значения, если нужно ---
         instance = self.instance
         if instance and instance.pk:
             ensure_legacy_choice("supervision_body", instance.supervision_body)
             ensure_legacy_choice("legal_form", instance.legal_form)
             ensure_legacy_choice("engagement_subject", instance.engagement_subject)
-
-    
-    
-
-
 
     def clean_reporting_period(self):
         """
@@ -380,6 +388,22 @@ class ClientForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+        # SERVER IGNORE:
+        # - при СОЗДАНИИ: запрещаем проставлять команду аудиторов/ассистентов
+        # - при РЕДАКТИРОВАНИИ: сохраняем старые значения (не даём менять здесь)
+        is_edit = bool(self.instance and self.instance.pk)
+
+        for fname in getattr(self, "_team_disabled_fields", []):
+            if fname not in self.fields:
+                continue
+
+            if is_edit:
+                # оставляем то, что уже было в базе
+                cleaned_data[fname] = getattr(self.instance, fname)
+            else:
+                # создание: принудительно пусто
+                cleaned_data[fname] = None
+
         audit_report_type = cleaned_data.get("audit_report_type")
         audit_report_date = cleaned_data.get("audit_report_date")
 
@@ -396,3 +420,45 @@ class ClientForm(forms.ModelForm):
             )
 
         return cleaned_data
+    
+from django.utils import timezone
+
+class Step15TeamForm(forms.Form):
+    """
+    Step 1.5: Формування команди та Етика
+    """
+    manager = forms.ModelChoiceField(queryset=User.objects.none(), required=True, label="Менеджер")
+    qa_manager = forms.ModelChoiceField(queryset=User.objects.none(), required=True, label="Менеджер КК")
+
+    auditor = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Аудитор 1")
+    auditor2 = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Аудитор 2")
+    auditor3 = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Аудитор 3")
+
+    assistant = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Асистент 1")
+    assistant2 = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Асистент 2")
+    assistant3 = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Асистент 3")
+    assistant4 = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="Асистент 4")
+
+    def __init__(self, *args, **kwargs):
+        client = kwargs.pop("client", None)
+        super().__init__(*args, **kwargs)
+
+        active_users = User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        for f in self.fields.values():
+            if isinstance(f, forms.ModelChoiceField):
+                f.queryset = active_users
+                f.widget.attrs["class"] = "form-control"
+
+        # предзаполнение из клиента
+        if client:
+            self.initial = {
+                "manager": client.manager_id,
+                "qa_manager": client.qa_manager_id,
+                "auditor": client.auditor_id,
+                "auditor2": client.auditor2_id,
+                "auditor3": client.auditor3_id,
+                "assistant": client.assistant_id,
+                "assistant2": client.assistant2_id,
+                "assistant3": client.assistant3_id,
+                "assistant4": client.assistant4_id,
+            }
