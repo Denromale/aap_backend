@@ -196,13 +196,30 @@ class Client(models.Model):
     # Аудиторський звіт
     audit_report_number = models.CharField(_("№ аудиторського звіту"), max_length=100, blank=True, null=True)
     audit_report_date = models.DateField(_("Дата аудиторського звіту"), blank=True, null=True)
-    audit_report_type = models.CharField(_("Вид аудиторського звіту"),  max_length=255, choices=REPORT_TYPE_CHOICES, blank=True, null=True,)
-    audit_report_paragraph = models.CharField(_("Параграф аудиторського звіту"), max_length=255, choices=REPORT_PARAGRAPH_CHOICES, blank=True, null=True,)
+    audit_report_type = models.CharField(
+        _("Вид аудиторського звіту"),
+        max_length=255,
+        choices=REPORT_TYPE_CHOICES,
+        blank=True,
+        null=True,
+    )
+    audit_report_paragraph = models.CharField(
+        _("Параграф аудиторського звіту"),
+        max_length=255,
+        choices=REPORT_PARAGRAPH_CHOICES,
+        blank=True,
+        null=True,
+    )
 
     supervision_notice_date = models.DateField(_("Дата повідомлення органу нагляду"), blank=True, null=True)
 
     cw_controls_done = models.BooleanField(_("Контрольні процедури в CW виконані"), default=False)
-    audit_report_scan = models.FileField(_("Скан-копія аудиторського звіту"), upload_to=client_audit_report_upload_to, blank=True, null=True,)
+    audit_report_scan = models.FileField(
+        _("Скан-копія аудиторського звіту"),
+        upload_to=client_audit_report_upload_to,
+        blank=True,
+        null=True,
+    )
 
     # Години
     planned_hours = models.DecimalField(_("Робочі години (план)"), max_digits=10, decimal_places=2, blank=True, null=True)
@@ -210,8 +227,9 @@ class Client(models.Model):
     # Статус
     status = models.CharField(_("Статус"), max_length=50, default="new")
 
-    is_completed = models.BooleanField(default=False, db_index=True, verbose_name=_("Проєкт завершено"))
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Дата завершення"))
+    # ✅ Завершення (ОСТАВЛЯЕМ ТОЛЬКО ОДИН РАЗ)
+    is_completed = models.BooleanField(_("Проєкт завершено"), default=False, db_index=True)
+    completed_at = models.DateTimeField(_("Дата завершення"), blank=True, null=True)
     completed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -220,7 +238,6 @@ class Client(models.Model):
         related_name="completed_clients",
         verbose_name=_("Хто завершив"),
     )
-
 
     # Команда
     manager = models.ForeignKey(
@@ -308,17 +325,6 @@ class Client(models.Model):
     assistant3_username = models.CharField(_("Асистент 3 (username)"), max_length=150, blank=True)
     assistant4_username = models.CharField(_("Асистент 4 (username)"), max_length=150, blank=True)
     qa_manager_username = models.CharField(_("QA-менеджер (username)"), max_length=150, blank=True)
-    is_completed = models.BooleanField(_("Проект завершено"), default=False, db_index=True)
-    completed_at = models.DateTimeField(_("Дата завершення"), blank=True, null=True)
-    completed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="completed_clients",
-        verbose_name=_("Хто завершив"),
-    )
-
 
     created_at = models.DateTimeField(_("Створено"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Оновлено"), auto_now=True)
@@ -333,15 +339,10 @@ class Client(models.Model):
         Логіка:
         1) Якщо створюється новий клієнт з номером+датою договору і вже існує
            запис з таким самим договором → команда КОПІЮЄТЬСЯ з першого запису.
-           Тобто введена в формі команда ігнорується, щоб всі проєкти за цим
-           договором мали одну й ту ж команду.
-        2) Якщо це перший запис за договором (ще немає інших клієнтів з тим
-           самим номером+датою) → зберігаємо як є і РОЗПОВСЮДЖУЄМО команду
-           по всіх майбутніх змінах цього запису.
+        2) Якщо це перший запис за договором → після save рознесемо команду.
         3) Якщо змінено команду у наявного клієнта → команда оновлюється в
            усіх записах з тим самим договором.
         """
-
         team_fields = [
             "manager",
             "auditor",
@@ -355,37 +356,29 @@ class Client(models.Model):
         ]
 
         is_new = self.pk is None
-        propagate_team = False  # чи треба після збереження оновлювати інших
+        propagate_team = False
 
-        # ---------- НОВИЙ ЗАПИС ----------
         if is_new:
-            # Якщо немає договору – нічого не розповсюджуємо та не копіюємо
             if not self.requisites_number or not self.requisites_date:
                 propagate_team = False
             else:
-                # Шукаємо "базовий" запис з таким самим договором
                 base_qs = Client.objects.filter(
                     organization=self.organization,
                     name=self.name,
                     requisites_number=self.requisites_number,
                     requisites_date=self.requisites_date,
                 )
-
                 base_client = base_qs.first()
 
                 if base_client:
-                    # Договір уже існує: КОПІЮЄМО команду з нього
+                    # копируем команду из базового проекта по договору
                     for field in team_fields:
                         setattr(self, field, getattr(base_client, field))
-                    # Не розповсюджуємо, команда вже узгоджена з базовим
                     propagate_team = False
                 else:
-                    # Це перший запис з таким договором → після save рознесемо
+                    # первый проект по договору — после save можно разнести команду
                     propagate_team = True
-
-        # ---------- ІСНУЮЧИЙ ЗАПИС ----------
         else:
-            # Перевіряємо, чи змінилась команда (щоб не робити зайвих оновлень)
             try:
                 old = Client.objects.get(pk=self.pk)
             except Client.DoesNotExist:
@@ -397,18 +390,13 @@ class Client(models.Model):
                         propagate_team = True
                         break
 
-        # ---------- ЗБЕРІГАЄМО ПОТОЧНИЙ ЗАПИС ----------
         super().save(*args, **kwargs)
 
-        # Якщо немає договору – нічого не розповсюджуємо
         if not self.requisites_number or not self.requisites_date:
             return
-
-        # Якщо не потрібно розповсюджувати – виходимо
         if not propagate_team:
             return
 
-        # ---------- ОНОВЛЮЄМО ІНШІ ЗАПИСИ З ТИМ САМИМ ДОГОВОРОМ ----------
         qs = Client.objects.filter(
             organization=self.organization,
             name=self.name,
@@ -422,17 +410,14 @@ class Client(models.Model):
         update_data = {field: getattr(self, field) for field in team_fields}
         qs.update(**update_data)
 
-
     def display_label(self) -> str:
         parts = [self.name or ""]
-
         if self.reporting_period:
             parts.append(str(self.reporting_period))
         if self.requisites_number:
             parts.append(f"Дог. {self.requisites_number}")
         if self.engagement_subject:
             parts.append(self.get_engagement_subject_display())
-
         return " | ".join(parts)
 
     def __str__(self) -> str:

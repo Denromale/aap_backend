@@ -66,7 +66,7 @@
                         <!-- Тип документа -->
                         <td style="border: 1px solid #ddd; padding: 6px;">
                             <select name="doc_type">
-                                <option value="">---------</option>
+                                <option value="">-----</option>
                                 {% for code, label in doc_type_choices %}
                                     <option value="{{ code }}"
                                             {% if doc.doc_type == code %}selected{% endif %}>
@@ -137,58 +137,54 @@
       return Array.from(document.querySelectorAll(".doc-check:checked")).map(x => x.value);
     }
   
-    function getCookie(name) {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-    }
-  
-    function getFilenameFromContentDisposition(cd) {
-      if (!cd) return null;
-  
-      // filename*=UTF-8''...
-      const mStar = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-      if (mStar) return decodeURIComponent(mStar[1]);
-  
-      // filename="..."
-      const m = cd.match(/filename\s*=\s*"([^"]+)"/i);
-      if (m) return m[1];
-  
-      // filename=...
-      const m2 = cd.match(/filename\s*=\s*([^;]+)/i);
-      if (m2) return m2[1].trim();
-  
-      return null;
-    }
-  
-    document.getElementById("btn-download-zip")?.addEventListener("click", async () => {
+    document.getElementById("btn-download-zip")?.addEventListener("click", () => {
       const ids = getSelectedDocIds();
-      if (!ids.length) { alert("Оберіть документи для завантаження."); return; }
+      if (!ids.length) {
+        alert("Оберіть документи для завантаження.");
+        return;
+      }
   
-      const form = new FormData();
-      form.append("doc_ids", ids.join(","));
-      form.append("client_id", "{{ selected_client.id|default:'' }}");
-      form.append("csrfmiddlewaretoken", getCookie("csrftoken"));
+      const idsInput = document.getElementById("download-doc-ids");
+      const form = document.getElementById("download-zip-form");
   
-      const resp = await fetch("{% url 'documents_download_zip' %}", { method: "POST", body: form });
-      if (!resp.ok) { alert("Не вдалося завантажити ZIP."); return; }
+      idsInput.value = ids.join(",");
   
-      const cd = resp.headers.get("Content-Disposition");
-      const filename = getFilenameFromContentDisposition(cd) || "documents.zip";
-  
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-  
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename; // ✅ теперь имя берём с сервера
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-  
-      URL.revokeObjectURL(url);
+      // важное: requestSubmit корректно запускает submit pipeline
+      form.requestSubmit();
     });
   </script>
   
+  
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const selectAll = document.getElementById("select-all");
+      if (!selectAll) return;
+    
+      const rowChecks = () => Array.from(document.querySelectorAll(".doc-check"));
+    
+      selectAll.addEventListener("change", () => {
+        rowChecks().forEach(ch => ch.checked = selectAll.checked);
+        selectAll.indeterminate = false;
+      });
+    
+      rowChecks().forEach(ch => {
+        ch.addEventListener("change", () => {
+          const checks = rowChecks();
+          const checked = checks.filter(x => x.checked).length;
+    
+          if (checked === 0) {
+            selectAll.indeterminate = false;
+            selectAll.checked = false;
+          } else if (checked === checks.length) {
+            selectAll.indeterminate = false;
+            selectAll.checked = true;
+          } else {
+            selectAll.indeterminate = true;
+          }
+        });
+      });
+    });
+    </script>
+    
   
 {% endblock %}

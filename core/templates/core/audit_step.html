@@ -315,18 +315,73 @@
 
         {# ===== ДОКУМЕНТИ: завжди останній блок підкроку ===== #}
         <div class="audit-docs" style="margin-top: 14px;">
-          <h4 class="audit-docs__title">Додаткові документи підкроку</h4>
-
-          <div class="audit-actions__note" style="margin-top:6px;">
-            Завантаження з «Бази документів» тимчасово вимкнено (інакше буде 403).
-            Документи додаються через відповідні дії/кнопки цього кроку.
+            <h4 class="audit-docs__title">Додаткові документи підкроку</h4>
+          
+            {# Список уже загруженных файлов по этому подшагу #}
+            {% with file_list=substep_files_map|get_item:s.id|stringformat:"s" %}
+            {% endwith %}
+          
+            {% with file_list=substep_files_map|get_item:s.id %}
+              {% if file_list %}
+                <div class="audit-docs__list" style="margin:8px 0 12px;">
+                  {% for f in file_list %}
+                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:6px;">
+                      <a href="{{ f.file.url }}" target="_blank" rel="noopener">
+                        {{ f.file.name }}
+                      </a>
+                      <form method="post" action="{% url 'procedure_file_delete' f.id %}" style="margin:0;">
+                        {% csrf_token %}
+                        <button class="btn btn-secondary" type="submit">Видалити</button>
+                      </form>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+          
+            {# Реальная загрузка файла #}
+            <form class="audit-docs__form"
+                  method="post"
+                  enctype="multipart/form-data"
+                  action="{% url 'procedure_file_upload' %}"
+                  style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              {% csrf_token %}
+              <input type="hidden" name="substep_id" value="{{ s.id }}">
+          
+              <input type="file" name="file" required>
+              <button type="submit" class="btn btn-primary">Завантажити</button>
+            </form>
+            <script>
+                document.addEventListener("submit", async (e) => {
+                  const form = e.target;
+                  if (!form.matches(".js-substep-upload")) return;
+                
+                  e.preventDefault();
+                
+                  const url = form.getAttribute("action");
+                  const fd = new FormData(form);
+                
+                  const resp = await fetch(url, {
+                    method: "POST",
+                    body: fd,
+                    headers: {"X-Requested-With": "XMLHttpRequest"},
+                    credentials: "same-origin",
+                  });
+                
+                  const data = await resp.json();
+                  if (!data.ok) {
+                    alert(data.error || "Upload error");
+                    return;
+                  }
+                
+                  // Тут самый простой вариант: просто перезагрузить текущую страницу БЕЗ редиректа на сервере
+                  // (страница останется audit_step, а не documents)
+                  window.location.reload();
+                });
+                </script>
+                
           </div>
-
-          <form class="audit-docs__form" style="opacity:.6; pointer-events:none;">
-            <input type="file" name="file" disabled>
-            <button type="button" class="btn btn-secondary" disabled>Додати документ</button>
-          </form>
-        </div>
+          
 
       </div>
     {% endfor %}
@@ -358,8 +413,16 @@
       });
     });
 
-    const first = steps[0] ? steps[0].dataset.code : null;
-    if (first) openPanel(first);
+    const params = new URLSearchParams(window.location.search);
+    const open = params.get("open");
+
+    if (open) {
+        openPanel(open);
+    } else {
+        const first = steps[0] ? steps[0].dataset.code : null;
+        if (first) openPanel(first);
+    }
+
   })();
   </script>
 
