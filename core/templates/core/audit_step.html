@@ -1,6 +1,7 @@
 {% extends "core/base.html" %}
 {% load i18n %}
 {% load aap_extras %}
+{% load static %}
 
 {% block title %}
   КРОК {{ step.order }} – {{ step.title }}
@@ -131,7 +132,7 @@
             <form method="post" novalidate class="team-form">
               {% csrf_token %}
               <input type="hidden" name="form_name" value="step15_team">
-        
+              <input type="hidden" name="substep_id" value="{{ s.id }}">
               {% if team_form.non_field_errors %}
                 <div class="field-error">{{ team_form.non_field_errors }}</div>
               {% endif %}
@@ -152,9 +153,12 @@
                 <div class="team-action-col">
                   {# кнопка справа показывается только если выбран пользователь и это текущий user #}
                   {% if team_form.manager.value and team_form.manager.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -174,9 +178,12 @@
         
                 <div class="team-action-col">
                   {% if team_form.qa_manager.value and team_form.qa_manager.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -187,9 +194,12 @@
                 <div class="team-select-col">{{ team_form.auditor }}</div>
                 <div class="team-action-col">
                   {% if team_form.auditor.value and team_form.auditor.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -200,9 +210,12 @@
                 <div class="team-select-col">{{ team_form.auditor2 }}</div>
                 <div class="team-action-col">
                   {% if team_form.auditor2.value and team_form.auditor2.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -213,9 +226,12 @@
                 <div class="team-select-col">{{ team_form.auditor3 }}</div>
                 <div class="team-action-col">
                   {% if team_form.auditor3.value and team_form.auditor3.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -226,9 +242,12 @@
                 <div class="team-select-col">{{ team_form.assistant }}</div>
                 <div class="team-action-col">
                   {% if team_form.assistant.value and team_form.assistant.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -239,9 +258,12 @@
                 <div class="team-select-col">{{ team_form.assistant2 }}</div>
                 <div class="team-action-col">
                   {% if team_form.assistant2.value and team_form.assistant2.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -252,9 +274,12 @@
                 <div class="team-select-col">{{ team_form.assistant3 }}</div>
                 <div class="team-action-col">
                   {% if team_form.assistant3.value and team_form.assistant3.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -265,9 +290,12 @@
                 <div class="team-select-col">{{ team_form.assistant4 }}</div>
                 <div class="team-action-col">
                   {% if team_form.assistant4.value and team_form.assistant4.value|stringformat:"s" == request.user.id|stringformat:"s" %}
-                    <button type="button" class="btn btn-secondary team-right-btn">
+                  <button type="submit"
+                         class="btn btn-secondary team-right-btn"
+                         formaction="{% url 'step15_generate_independence' %}"
+                         formmethod="post">
                       Анкета незалежності
-                    </button>
+                  </button>
                   {% endif %}
                 </div>
               </div>
@@ -277,16 +305,18 @@
                 <button type="submit" class="btn btn-primary" name="action" value="save_team">
                   Зберегти команду
                 </button>
-        
+              
                 <button type="submit" class="btn btn-secondary" name="action" value="generate_request">
                   Розпорядження на призначення команди
                 </button>
-        
-                {# "Памʼятка" — пока как UI-кнопка. Потом привяжем к действию/документу #}
-                <button type="button" class="btn btn-secondary">
+              
+                <button type="submit" class="btn btn-secondary" name="action" value="generate_remembrance">
                   Памʼятка
                 </button>
               </div>
+              
+              
+              
             </form>
           {% endif %}
         {% endif %}
@@ -340,7 +370,7 @@
             {% endwith %}
           
             {# Реальная загрузка файла #}
-            <form class="audit-docs__form"
+            <form class="audit-docs__form js-substep-upload"
                   method="post"
                   enctype="multipart/form-data"
                   action="{% url 'procedure_file_upload' %}"
@@ -350,81 +380,15 @@
           
               <input type="file" name="file" required>
               <button type="submit" class="btn btn-primary">Завантажити</button>
-            </form>
-            <script>
-                document.addEventListener("submit", async (e) => {
-                  const form = e.target;
-                  if (!form.matches(".js-substep-upload")) return;
-                
-                  e.preventDefault();
-                
-                  const url = form.getAttribute("action");
-                  const fd = new FormData(form);
-                
-                  const resp = await fetch(url, {
-                    method: "POST",
-                    body: fd,
-                    headers: {"X-Requested-With": "XMLHttpRequest"},
-                    credentials: "same-origin",
-                  });
-                
-                  const data = await resp.json();
-                  if (!data.ok) {
-                    alert(data.error || "Upload error");
-                    return;
-                  }
-                
-                  // Тут самый простой вариант: просто перезагрузить текущую страницу БЕЗ редиректа на сервере
-                  // (страница останется audit_step, а не documents)
-                  window.location.reload();
-                });
-                </script>
-                
+            </form>                           
           </div>
-          
-
       </div>
     {% endfor %}
   </div>
 
-  <script>
-  (function () {
-    const stepper = document.getElementById('subStepper');
-    if (!stepper) return;
+<script src="{% static 'core/audit_stepper.js' %}"></script>
+<script src="{% static 'core/audit_upload.js' %}"></script>
 
-    const steps = stepper.querySelectorAll('.aap-step');
-    const panels = document.querySelectorAll('.aap-step-panel');
-
-    function openPanel(code) {
-      steps.forEach(s => s.classList.remove('is-active'));
-      panels.forEach(p => p.classList.remove('is-open'));
-
-      const activeStep = stepper.querySelector(`.aap-step[data-code="${code}"]`);
-      const activePanel = document.getElementById(`panel-${code}`);
-
-      if (activeStep) activeStep.classList.add('is-active');
-      if (activePanel) activePanel.classList.add('is-open');
-    }
-
-    steps.forEach(s => {
-      s.addEventListener('click', () => openPanel(s.dataset.code));
-      s.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') openPanel(s.dataset.code);
-      });
-    });
-
-    const params = new URLSearchParams(window.location.search);
-    const open = params.get("open");
-
-    if (open) {
-        openPanel(open);
-    } else {
-        const first = steps[0] ? steps[0].dataset.code : null;
-        if (first) openPanel(first);
-    }
-
-  })();
-  </script>
 
 {% endif %}
 {% endblock %}

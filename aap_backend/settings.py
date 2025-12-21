@@ -200,6 +200,9 @@ CSRF_TRUSTED_ORIGINS = [
     "https://aap-backend.onrender.com",
 ]
 
+DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 if not DEBUG:

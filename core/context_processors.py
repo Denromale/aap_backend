@@ -1,4 +1,4 @@
-from .decorators import is_manager
+from .permissions import is_manager
 from .models import Client
 
 def aap_globals(request):
