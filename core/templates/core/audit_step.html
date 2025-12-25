@@ -76,10 +76,16 @@
   {# Подшаги: степпер + панели #}
   <div class="aap-stepper aap-stepper--sub" id="subStepper">
     {% for s in substeps %}
-      <div class="aap-step aap-step--idle {% if forloop.first %}is-active{% endif %}"
+      {% with sid=s.id|stringformat:"s" %}
+      <div class="aap-step {{ substep_status_class|get_item:sid }} {% if forloop.first %}is-active{% endif %}"
            data-code="{{ s.id }}" role="button" tabindex="0">
-        {{ s.order }}
+        <span class="aap-step-num">{{ s.order }}</span>
+        {% if substep_is_done|get_item:sid %}
+          <span class="aap-step-check">✓</span>
+        {% endif %}
       </div>
+      {% endwith %}
+
       {% if not forloop.last %}<div class="aap-step-line"></div>{% endif %}
     {% endfor %}
   </div>
@@ -124,9 +130,9 @@
           <hr style="margin:14px 0;">
           <h4 style="margin:0 0 10px;">Формування команди</h4>
         
-          {% if not can_manage_step15 %}
+          {% if not can_view_step15 %}
             <div class="audit-hint">
-              Немає прав змінювати команду на кроці 1.5.
+              Немає доступу до кроку 1.5.
             </div>
           {% else %}
             <form method="post" novalidate class="team-form">
@@ -302,18 +308,26 @@
         
               {# ===== КНОПКИ ВНИЗУ (друг под другом как на твоём 1-м фото) ===== #}
               <div class="team-bottom-actions">
-                <button type="submit" class="btn btn-primary" name="action" value="save_team">
-                  Зберегти команду
-                </button>
-              
+                {% if can_manage_step15 %}
+                  <button type="submit" class="btn btn-primary" name="action" value="save_team">
+                    Зберегти команду
+                  </button>
+                {% else %}
+                  <div class="audit-hint" style="margin-bottom:8px;">
+                    Ви можете переглядати команду, але не маєте прав її змінювати.
+                  </div>
+                {% endif %}
+
+                {# генерация разрешена члену команды #}
                 <button type="submit" class="btn btn-secondary" name="action" value="generate_request">
                   Розпорядження на призначення команди
                 </button>
-              
+
                 <button type="submit" class="btn btn-secondary" name="action" value="generate_remembrance">
                   Памʼятка
                 </button>
               </div>
+
               
               
               
@@ -324,34 +338,33 @@
 
         {# ===== ДІЇ РІВНЯ ПІДКРОКУ (кнопки внизу підкроку) ===== #}
         {% with actions_list=substep_actions_map|get_item:s.id %}
-          {% if actions_list %}
-            <div class="audit-actions" style="margin-top: 14px;">
-              <h4 class="audit-actions__title">Дії для підкроку</h4>
-              <div class="audit-actions__list">
-                {% for a in actions_list %}
-                  <div class="audit-action">
-                    <button type="button" class="btn btn-primary audit-action__btn" disabled title="Поки що без виконання">
-                      {{ a.label }}
-                    </button>
-                    {% if a.description %}
-                      <div class="audit-action__desc">{{ a.description }}</div>
-                    {% endif %}
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
+           {% for a in actions_list %}
+             <div class="audit-action">
+               <form method="post" style="display:inline;">
+                 {% csrf_token %}
+                 <input type="hidden" name="form_name" value="substep_action">
+                 <input type="hidden" name="substep_id" value="{{ s.id }}">
+                 <input type="hidden" name="action_id" value="{{ a.id }}">
+
+                 <button type="submit" class="btn btn-primary audit-action__btn">
+                   {{ a.label }}
+                 </button>
+               </form>
+
+               {% if a.description %}
+                 <div class="audit-action__desc">{{ a.description }}</div>
+               {% endif %}
+             </div>
+           {% endfor %}
+
         {% endwith %}
 
         {# ===== ДОКУМЕНТИ: завжди останній блок підкроку ===== #}
         <div class="audit-docs" style="margin-top: 14px;">
-            <h4 class="audit-docs__title">Додаткові документи підкроку</h4>
-          
-            {# Список уже загруженных файлов по этому подшагу #}
-            {% with file_list=substep_files_map|get_item:s.id|stringformat:"s" %}
-            {% endwith %}
-          
-            {% with file_list=substep_files_map|get_item:s.id %}
+          <h4 class="audit-docs__title">Додаткові документи підкроку</h4>
+
+          {% with sid=s.id|stringformat:"s" %}
+            {% with file_list=substep_files_map|get_item:sid %}
               {% if file_list %}
                 <div class="audit-docs__list" style="margin:8px 0 12px;">
                   {% for f in file_list %}
@@ -368,20 +381,42 @@
                 </div>
               {% endif %}
             {% endwith %}
-          
-            {# Реальная загрузка файла #}
-            <form class="audit-docs__form js-substep-upload"
-                  method="post"
-                  enctype="multipart/form-data"
-                  action="{% url 'procedure_file_upload' %}"
-                  style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              {% csrf_token %}
-              <input type="hidden" name="substep_id" value="{{ s.id }}">
-          
-              <input type="file" name="file" required>
-              <button type="submit" class="btn btn-primary">Завантажити</button>
-            </form>                           
-          </div>
+          {% endwith %}
+
+          <form method="post" action="{% url 'procedure_file_upload' %}"
+                enctype="multipart/form-data" class="js-substep-upload">
+            {% csrf_token %}
+            <input type="hidden" name="substep_id" value="{{ s.id }}">
+            <input type="file" name="file" required>
+            <button type="submit" class="btn btn-primary">Завантажити</button>
+          </form>
+                  {# ===== AAP: Manual done toggle ("Виконано") ===== #}
+        {% with sid=s.id|stringformat:"s" %}
+          {% if can_toggle_done %}
+            <div class="substep-done-box">
+              {% if substep_is_done|get_item:sid %}
+                <div class="substep-done-meta">
+                  {% with n=completed_by_label|get_item:sid %}
+                    {% if n %}<div><b>Виконав:</b> {{ n }}</div>{% endif %}
+                  {% endwith %}
+                  {% with dt=completed_at_label|get_item:sid %}
+                    {% if dt %}<div><b>Коли:</b> {{ dt }}</div>{% endif %}
+                  {% endwith %}
+                </div>
+              {% endif %}
+
+              <form method="post" action="{% url 'substep_status_toggle' %}" class="substep-done-form">
+                {% csrf_token %}
+                <input type="hidden" name="substep_id" value="{{ s.id }}">
+                <button type="submit" class="btn btn-secondary">
+                  {% if substep_is_done|get_item:sid %}Скасувати виконано{% else %}Виконано{% endif %}
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        </div>         
       </div>
     {% endfor %}
   </div>

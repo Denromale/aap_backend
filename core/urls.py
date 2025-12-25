@@ -1,6 +1,9 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from core import views
+from core.views.upload_monitoring import upload_monitoring
+
 
 urlpatterns = [
     # --- Auth ---
@@ -48,6 +51,9 @@ urlpatterns = [
         name="audit_step_action_run",
     ),
 
+    # --- Substep manual status ---
+    path("audit/substep/status-toggle/", views.substep_status_toggle, name="substep_status_toggle"),
+
     # --- Audit files ---
     path("audit/procedure-file/upload/", views.procedure_file_upload, name="procedure_file_upload"),
     path("procedure-file/<int:pk>/delete/", views.procedure_file_delete, name="procedure_file_delete"),
@@ -67,7 +73,17 @@ urlpatterns = [
     # --- Metrics ---
     path("metrics/", views.metrics_view, name="metrics"),
 
+    # --- Monitoring ---
+    path("upload-monitoring/", upload_monitoring, name="upload_monitoring"),  
+    path(
+    "upload-monitoring/user/<int:user_id>/",
+    upload_monitoring,
+    name="upload_monitoring_user",
+),  
+    
     # --- Legacy client steps ---
     path("client/step-1/", views.client_step_1, name="client_step_1"),
     path("client/step-2/", views.client_step_2, name="client_step_2"),
 ]
+
+

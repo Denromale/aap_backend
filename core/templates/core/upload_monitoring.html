@@ -1,0 +1,344 @@
+{% extends "core/base.html" %}
+{% load aap_extras %}
+
+{% block title %}Моніторинг завантажень{% endblock %}
+
+{% block content %}
+<h1 style="margin:0 0 10px;">
+  {% if selected_user %}
+    Моніторинг завантажень — {{ selected_user.get_full_name|default:selected_user.username }}
+  {% else %}
+    Моніторинг завантажень
+  {% endif %}
+</h1>
+
+
+<style>
+  /* компактная таблица */
+  .um-table { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff; }
+  .um-table th, .um-table td { border:1px solid #e5e7eb; padding:6px 8px; vertical-align:middle; }
+  .um-table th { background:#f9fafb; font-weight:700; font-size:13px; }
+  .um-table td { font-size:13px; }
+  .um-wrap { white-space:normal; word-break:break-word; }
+
+  /* кружочки: вертикально под шагами */
+  .um-steps-grid{
+    display:grid;
+    grid-template-columns: repeat(12, 20px);
+    gap: 2px;
+    align-items:start;
+    justify-content:start;
+  }
+  .um-step-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    min-width:0;
+  }
+  .um-step-num{
+    font-weight:700;
+    font-size:12px;
+    line-height:1;
+  }
+  .um-dots-col{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    align-items:center;
+  }
+  .um-dot{
+    width:8px; height:8px; border-radius:50%;
+    border:1px solid #cbd5e1;
+    background:#e5e7eb;
+    pointer-events:none;
+    cursor:default;
+  }
+  .um-dot.done { background:#22c55e; border-color:#16a34a; }
+  .um-dot.progress { background:#facc15; border-color:#eab308; }
+
+  /* чекбокс фиксированно по месту */
+  .um-toolbar { display:flex; align-items:center; gap:12px; margin:8px 0 12px; }
+  .um-toolbar label { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+
+  /* мини-окно команды */
+  .um-modal-backdrop{
+    position:fixed; inset:0; background:rgba(15,23,42,0.35);
+    display:none; align-items:center; justify-content:center; z-index:9999;
+  }
+  .um-modal{
+    width:min(520px, 92vw);
+    background:#fff; border-radius:12px; padding:14px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  }
+  .um-modal h3{ margin:0 0 10px; font-size:16px; }
+  .um-modal ul{ margin:0; padding-left:18px; }
+  .um-close{ border:1px solid #e5e7eb; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
+  .um-team-btn{ color:#2563eb; text-decoration:none; font-weight:700; cursor:pointer; }
+  .um-team-btn:hover{ text-decoration:underline; }
+
+  /* чтобы без горизонтального скролла: сжимаем колонки */
+  .w-client{ width:16%; }
+  .w-subject{ width:35%; }
+  .w-deadline{ width:10%; }
+  .w-manager{ width:14%; }
+  .w-team{ width:7%; }
+  .w-steps{ width:18%; }
+
+  /* строка фильтров в шапке */
+  .um-filter-row th{ padding:6px 8px; background:#fff; }
+  .um-filter-row select, .um-filter-row input{
+    width:100%; padding:5px 6px; border:1px solid #e5e7eb; border-radius:8px;
+    font-size:13px; background:#fff;
+  }
+
+  .um-apply-btn{
+        width:auto;                 /* ⬅ ключевая правка */
+        padding:6px 14px;
+        border:1px solid #e5e7eb;
+        border-radius:8px;
+        background:#a5b1fa;
+        cursor:pointer;
+        font-weight:700;
+        white-space:nowrap;
+    }
+    .um-reset-btn{
+        display:inline-block;
+        width:auto;
+        padding:6px 14px;
+        border:1px solid #e5e7eb;
+        border-radius:8px;
+        background:#fff;
+        cursor:pointer;
+        font-weight:700;
+        white-space:nowrap;
+        text-decoration:none;
+        color:#111827;
+    }
+    .um-reset-btn:hover{
+       background:#f9fafb;
+    }
+    .um-action-btn{
+    width:140px;              /* фиксированная одинаковая ширина */
+    padding:6px 0;
+    border-radius:8px;
+    font-weight:700;
+    font-size:13px;
+    text-align:center;
+    cursor:pointer;
+    white-space:nowrap;
+    }
+
+    .um-apply-btn{
+    border:1px solid #6366f1;
+    background:#6366f1;
+    color:#fff;
+    }
+
+    .um-apply-btn:hover{
+    background:#4f46e5;
+    }
+
+    .um-reset-btn{
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:#111827;
+    }
+
+    .um-reset-btn:hover{
+    background:#f9fafb;
+    }
+
+
+</style>
+
+{# ВАЖНО: форма теперь оборачивает и чекбокс и таблицу #}
+<form method="get">
+
+  <div class="um-toolbar">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <input type="hidden" name="active_only" value="0">
+        <label>
+        <input type="checkbox" name="active_only" value="1"
+                {% if active_only %}checked{% endif %}
+                onchange="this.form.submit()">
+        Активні проєкти
+        </label>
+    </div>
+
+    <div style="margin-left:auto; display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+    <button type="submit" class="um-action-btn um-apply-btn">
+        Застосувати
+    </button>
+
+    <a href="{{ request.path }}" class="um-action-btn um-reset-btn">
+        Скинути
+    </a>
+    </div>
+
+    </div>
+
+
+  <table class="um-table">
+    <thead>
+      <tr>
+        <th class="w-client">Назва клієнта</th>
+        <th class="w-subject">Предмет завдання</th>
+        <th class="w-deadline">Кінцевий строк</th>
+        <th class="w-manager">Менеджер проєкту</th>
+        <th class="w-team">Команда</th>
+        <th class="w-steps">Кроки</th>
+      </tr>
+
+      {# ФИЛЬТРЫ: НЕ авто-применяются. Применяются по кнопке. #}
+      <tr class="um-filter-row">
+        <th></th>
+
+        <th>
+          <select name="subject">
+            <option value="">— всі —</option>
+            {% for opt in subject_choices %}
+              <option value="{{ opt.value }}" {% if context_filters.subject == opt.value %}selected{% endif %}>
+                {{ opt.label }}
+              </option>
+            {% endfor %}
+          </select>
+        </th>
+
+        <th>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <input type="date" name="date_from" value="{{ context_filters.date_from }}">
+            <input type="date" name="date_to" value="{{ context_filters.date_to }}">
+          </div>
+        </th>
+
+        <th>
+          <select name="manager">
+            <option value="">— всі —</option>
+            {% for opt in manager_choices %}
+              <option value="{{ opt.value }}" {% if context_filters.manager == opt.value %}selected{% endif %}>
+                {{ opt.label }}
+              </option>
+            {% endfor %}
+          </select>
+        </th>
+
+        <th>
+        </th>
+
+        <th></th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="um-wrap">
+            <div style="font-weight:800;">{{ row.client_name }}</div>
+            {% if row.client.is_completed %}
+              <div style="font-size:12px; color:#6b7280;">(архів)</div>
+            {% endif %}
+          </td>
+
+          <td class="um-wrap">
+            {{ row.engagement_subject|default:"—" }}
+          </td>
+
+          <td>
+            {% if row.contract_deadline %}
+              {{ row.contract_deadline|date:"d.m.Y" }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <td class="um-wrap">
+            {% if row.manager %}
+                <a class="table-action-link" href="{% url 'upload_monitoring_user' row.manager.id %}">
+                {% with full=row.manager.get_full_name %}
+                    {{ full|default:row.manager.username }}
+                {% endwith %}
+                </a>
+            {% else %}
+                —
+            {% endif %}
+          </td>
+
+          <td>
+            <span class="um-team-btn"
+                  data-team="{% for u in row.team.users %}{{ u.id }}::{{ u.get_full_name|default:u.username|escapejs }}{% if not forloop.last %}||{% endif %}{% endfor %}"
+                  onclick="openTeamModal(this)">
+              {{ row.team.count }}
+            </span>
+          </td>
+
+          <td>
+            <div class="um-steps-grid">
+              {% for step in steps %}
+                <div class="um-step-col" title="{{ step.title }}">
+                  <div class="um-step-num">{{ step.order }}</div>
+                  <div class="um-dots-col">
+                    {% for sub in substeps_by_step|get_item:step.id %}
+                      {% with st=row.substep_status_map|get_item:sub.id %}
+                        <span class="um-dot {% if st == 'done' %}done{% elif st == 'progress' %}progress{% endif %}"
+                              title="{{ step.order }}.{{ sub.order }} — {{ sub.title }}"></span>
+                      {% endwith %}
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">Проєктів немає.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</form>
+
+{# modal команды #}
+<div class="um-modal-backdrop" id="umModalBackdrop" onclick="closeTeamModal(event)">
+  <div class="um-modal" onclick="event.stopPropagation()">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <h3 style="flex:1 1 auto;">Команда проєкту</h3>
+      <button class="um-close" type="button" onclick="closeTeamModal()">Закрити</button>
+    </div>
+    <ul id="umTeamList"></ul>
+  </div>
+</div>
+
+<script>
+  function openTeamModal(el) {
+    const raw = el.getAttribute("data-team") || "";
+    const items = raw ? raw.split("||").filter(Boolean) : [];
+    const ul = document.getElementById("umTeamList");
+    ul.innerHTML = "";
+    if (!items.length) {
+      const li = document.createElement("li");
+      li.textContent = "Команда не заповнена";
+      ul.appendChild(li);
+    } else {
+      items.forEach(item => {
+        const [id, name] = item.split("::");
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.textContent = name;
+        a.href = `/upload-monitoring/user/${id}/`;
+        a.style.color = "#2563eb";
+        a.style.cursor = "pointer";
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+
+    }
+    document.getElementById("umModalBackdrop").style.display = "flex";
+  }
+
+  function closeTeamModal() {
+    document.getElementById("umModalBackdrop").style.display = "none";
+  }
+</script>
+
+{% endblock %}

@@ -5,8 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from core.models import News  # если уже импортировано — не дублируй
 from core.views._client_qs import get_user_clients_qs
-from decimal import Decimal
 from decimal import Decimal, ROUND_HALF_UP
+from django.http import HttpResponseForbidden
+from core.models import ClientDocument
 
 
 from core.models import Client
@@ -286,7 +287,7 @@ def client_delete(request, pk):
 
     # только менеджер или суперюзер
     is_manager_flag = is_manager(request.user)
-    if not (is_manager or request.user.is_superuser):
+    if not (is_manager_flag or request.user.is_superuser):
         return HttpResponseForbidden("У вас немає прав видаляти клієнтів.")
 
     # если надо подтверждение – можно оставить GET-страницу.

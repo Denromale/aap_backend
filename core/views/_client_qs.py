@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.db.models import Q
-
+from core.permissions import is_manager
 from core.models import Client
 
 TEAM_ROLE_FIELDS = [
@@ -36,7 +36,8 @@ def get_user_clients_qs(user, organization=None, completed: bool | None = None):
     if organization is not None:
         qs = qs.filter(organization=organization)
 
-    if not user.is_superuser:
+    # superuser и manager-группа видят все проекты организации
+    if not user.is_superuser and not is_manager(user):
         qs = qs.filter(build_team_q(user))
 
     if completed is not None:

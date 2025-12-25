@@ -555,6 +555,47 @@ class AuditSubStep(models.Model):
     def __str__(self) -> str:
         return f"{self.step.order}.{self.order} {self.title}"
 
+class ClientSubStepStatus(models.Model):
+    class Status(models.TextChoices):
+        NOT_STARTED = "not_started", _("Не виконано")
+        COMPLETED = "completed", _("Виконано")
+
+    client = models.ForeignKey(
+        "Client",
+        on_delete=models.CASCADE,
+        related_name="substep_statuses",
+    )
+    substep = models.ForeignKey(
+        "AuditSubStep",
+        on_delete=models.CASCADE,
+        related_name="client_statuses",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NOT_STARTED,
+    )
+
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="completed_substeps",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("client", "substep")
+        indexes = [
+            models.Index(fields=["client", "substep"]),
+            models.Index(fields=["client", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.client_id} / {self.substep_id} / {self.status}"
 
 class StepAction(models.Model):
     class Scope(models.TextChoices):

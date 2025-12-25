@@ -4,16 +4,16 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from core.forms import Step15TeamForm
-from core.models import ProcedureFile
-
+from core.models import ProcedureFile, ClientSubStepStatus  # AAP: manual done status model
+from django.utils import timezone
+from django.db.models import Count
+from django.db.models import Q
+from core.permissions import user_in_client_team
+from django.http import HttpResponseForbidden
 
 from core.models import AuditStep, AuditSubStep, StepAction
 from core.utils import require_active_client
-from core.permissions import (
-    is_manager,
-    can_manage_step15,
-    action_allowed_for_user,
-)
+from core.permissions import is_manager, can_manage_step15, action_allowed_for_user, user_in_client_team
 from core.services.documents import _fill_docx_bytes, _step15_save_generated
 
 
@@ -34,35 +34,65 @@ def audit_step_view(request, step_order: int):
     team_form = None
 
     # ===== POST Step 1.5: сохранить команду / сформировать документы =====
+       # ===== POST Step 1.5: сохранить команду / сформировать документы =====
     if request.method == "POST" and request.POST.get("form_name") == "step15_team":
         if not step15_substep:
             return HttpResponseForbidden("Step 1.5 не налаштований.")
-        if not can_manage_step15(request.user, client):
-            return HttpResponseForbidden("Немає прав формувати команду на кроці 1.5.")
 
-        team_form = Step15TeamForm(request.POST, client=client)
+        action = request.POST.get("action") or "save_team"
 
-        if team_form.is_valid():
-            client.manager = team_form.cleaned_data["manager"]
-            client.qa_manager = team_form.cleaned_data["qa_manager"]
-            client.auditor = team_form.cleaned_data["auditor"]
-            client.auditor2 = team_form.cleaned_data["auditor2"]
-            client.auditor3 = team_form.cleaned_data["auditor3"]
-            client.assistant = team_form.cleaned_data["assistant"]
-            client.assistant2 = team_form.cleaned_data["assistant2"]
-            client.assistant3 = team_form.cleaned_data["assistant3"]
-            client.assistant4 = team_form.cleaned_data["assistant4"]
-            client.save()
+        # кто вообще может работать с Step 1.5 (видеть/генерировать)
+        can_view_step15 = bool(
+            request.user.is_superuser
+            or is_manager(request.user)
+            or user_in_client_team(request.user, client)
+        )
 
-            action = request.POST.get("action") or "save_team"
+        if not can_view_step15:
+            return HttpResponseForbidden("Немає прав доступу до кроку 1.5.")
 
-            # 1) просто сохранить
-            if action == "save_team":
+        # 1) СОХРАНЕНИЕ команды — только менеджер/супер
+        if action == "save_team":
+            if not can_manage_step15(request.user, client):
+                return HttpResponseForbidden("Немає прав змінювати команду на кроці 1.5.")
+
+            team_form = Step15TeamForm(request.POST, client=client)
+            if team_form.is_valid():
+                client.manager = team_form.cleaned_data["manager"]
+                client.qa_manager = team_form.cleaned_data["qa_manager"]
+                client.auditor = team_form.cleaned_data["auditor"]
+                client.auditor2 = team_form.cleaned_data["auditor2"]
+                client.auditor3 = team_form.cleaned_data["auditor3"]
+                client.assistant = team_form.cleaned_data["assistant"]
+                client.assistant2 = team_form.cleaned_data["assistant2"]
+                client.assistant3 = team_form.cleaned_data["assistant3"]
+                client.assistant4 = team_form.cleaned_data["assistant4"]
+                client.save()
+
                 messages.success(request, "Команду збережено (Step 1.5).")
                 return redirect(reverse("audit_step", args=[step_order]) + f"?open={step15_substep.id}")
 
-            # 2) розпорядження (только менеджер-группа/супер)
-                        # FIX: генерим здесь, а не редиректим на POST-only view
+            # если невалидна — упадём ниже и покажем ошибки
+            # (team_form останется заполненной ошибками)
+            # и page-render ниже отработает как обычно
+
+        # 2) ГЕНЕРАЦИЯ документов — разрешено члену команды
+        elif action in ("generate_request", "generate_remembrance"):
+            # менеджеру позволяем перед генерацией сохранить изменения из формы (если он их менял)
+            if can_manage_step15(request.user, client):
+                tmp_form = Step15TeamForm(request.POST, client=client)
+                if tmp_form.is_valid():
+                    client.manager = tmp_form.cleaned_data["manager"]
+                    client.qa_manager = tmp_form.cleaned_data["qa_manager"]
+                    client.auditor = tmp_form.cleaned_data["auditor"]
+                    client.auditor2 = tmp_form.cleaned_data["auditor2"]
+                    client.auditor3 = tmp_form.cleaned_data["auditor3"]
+                    client.assistant = tmp_form.cleaned_data["assistant"]
+                    client.assistant2 = tmp_form.cleaned_data["assistant2"]
+                    client.assistant3 = tmp_form.cleaned_data["assistant3"]
+                    client.assistant4 = tmp_form.cleaned_data["assistant4"]
+                    client.save()
+
             if action == "generate_request":
                 file_bytes = _fill_docx_bytes("order.docx", client, request.user)
                 filename = f"order_{client.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
@@ -73,23 +103,62 @@ def audit_step_view(request, step_order: int):
                 messages.success(request, "Розпорядження сформовано та збережено.")
                 return redirect(reverse("audit_step", args=[step_order]) + f"?open={step15_substep.id}")
 
-            if action == "generate_remembrance":
-                file_bytes = _fill_docx_bytes("remembrance_team.docx", client, request.user)
-                filename = f"remembrance_team_{client.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
-                _step15_save_generated(
-                    request, client=client, substep=step15_substep,
-                    file_bytes=file_bytes, filename=filename, title=filename
-                )
-                messages.success(request, "Памʼятку сформовано та збережено.")
-                return redirect(reverse("audit_step", args=[step_order]) + f"?open={step15_substep.id}")
-
-
-
-            # fallback
-            messages.success(request, "Команду збережено (Step 1.5).")
+            # generate_remembrance
+            file_bytes = _fill_docx_bytes("remembrance_team.docx", client, request.user)
+            filename = f"remembrance_team_{client.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
+            _step15_save_generated(
+                request, client=client, substep=step15_substep,
+                file_bytes=file_bytes, filename=filename, title=filename
+            )
+            messages.success(request, "Памʼятку сформовано та збережено.")
             return redirect(reverse("audit_step", args=[step_order]) + f"?open={step15_substep.id}")
 
+        # fallback (на всякий)
+        return redirect(reverse("audit_step", args=[step_order]) + f"?open={step15_substep.id}")
+
+
         # если форма невалидна — просто упадём ниже и отрисуем ошибки
+        # ===== POST: выполнение универсальной кнопки подшага (StepAction) =====
+    if request.method == "POST" and request.POST.get("form_name") == "substep_action":
+        substep_id = request.POST.get("substep_id")
+        action_id = request.POST.get("action_id")
+
+        if not substep_id or not action_id:
+            return HttpResponseForbidden("Некоректні дані дії.")
+
+        substep = get_object_or_404(AuditSubStep, id=int(substep_id), is_active=True, step=step)
+        action = get_object_or_404(StepAction, id=int(action_id), enabled=True)
+
+        # защита: действие должно быть привязано к этому подшагу
+        if action.substep_id != substep.id:
+            return HttpResponseForbidden("Дія не належить цьому підкроку.")
+
+        # защита: права
+        if not action_allowed_for_user(action, request.user, client):
+            return HttpResponseForbidden("Немає прав виконувати цю дію.")
+
+        # ===== Реальные действия по ключу =====
+        if action.key == "generate_step1_3_acceptance_docx":
+            # шаблон должен лежать в core/docs/
+            file_bytes = _fill_docx_bytes("acceptance_task.docx", client, request.user)
+            filename = f"acceptance_task_{client.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.docx"
+
+            _step15_save_generated(
+                request,
+                client=client,
+                substep=substep,
+                file_bytes=file_bytes,
+                filename=filename,
+                title=action.label or filename,
+            )
+
+            messages.success(request, "Документ сформовано та збережено.")
+            return redirect(reverse("audit_step", args=[step_order]) + f"?open={substep.id}")
+
+        # если ключ не поддержан
+        messages.warning(request, f"Дія '{action.key}' ще не налаштована.")
+        return redirect(reverse("audit_step", args=[step_order]) + f"?open={substep.id}")
+
 
     # если не POST Step 1.5 — показываем форму
     if step15_substep and team_form is None:
@@ -121,6 +190,71 @@ def audit_step_view(request, step_order: int):
     for f in files_qs:
         key = str(f.procedure_code)
         substep_files_map.setdefault(key, []).append(f)
+       
+        # ===============================
+    # Статуси підкроків (manual done + files progress)
+    # ===============================
+
+    substep_ids = [s.id for s in substeps]
+    substep_ids_str = [str(sid) for sid in substep_ids]
+
+    # 1) Скільки файлів завантажено під кожен підкрок (progress = >=1)
+    counts_qs = (
+        ProcedureFile.objects
+        .filter(client=client, procedure_code__in=substep_ids_str)
+        .values("procedure_code")
+        .annotate(cnt=Count("id"))
+    )
+    files_count_by_code = {row["procedure_code"]: row["cnt"] for row in counts_qs}
+    files_count_by_substep = {sid: files_count_by_code.get(str(sid), 0) for sid in substep_ids}
+
+    # 2) Ручний статус (done = тільки через кнопку "Виконано")
+    statuses_qs = (
+        ClientSubStepStatus.objects
+        .filter(client=client, substep_id__in=substep_ids)
+        .select_related("completed_by")
+    )
+    status_obj_by_substep = {st.substep_id: st for st in statuses_qs}
+
+    substep_is_done = {
+        sid: (
+            status_obj_by_substep.get(sid)
+            and status_obj_by_substep[sid].status == ClientSubStepStatus.Status.COMPLETED
+        )
+        for sid in substep_ids
+    }
+
+    # AAP: строкові ключі для шаблона (бо get_item працює по str)
+    substep_is_done_str = {str(k): bool(v) for k, v in substep_is_done.items()}
+
+    # 3) CSS-клас кружка в степпері (done > progress > idle)
+    substep_status_class = {}
+    for sid in substep_ids:
+        if substep_is_done.get(sid):
+            substep_status_class[str(sid)] = "aap-step--done"
+        elif files_count_by_substep.get(sid, 0) >= 1:
+            substep_status_class[str(sid)] = "aap-step--progress"
+        else:
+            substep_status_class[str(sid)] = "aap-step--idle"
+
+    # 4) Хто/коли натиснув "Виконано" (для UI)
+    completed_by_label = {}
+    completed_at_label = {}
+    for sid, st in status_obj_by_substep.items():
+        if st.status != ClientSubStepStatus.Status.COMPLETED:
+            continue
+
+        if st.completed_by:
+            completed_by_label[str(sid)] = st.completed_by.get_full_name() or st.completed_by.username
+        else:
+            completed_by_label[str(sid)] = ""
+
+        if st.completed_at:
+            completed_at_label[str(sid)] = timezone.localtime(st.completed_at).strftime("%d.%m.%Y %H:%M")
+        else:
+            completed_at_label[str(sid)] = ""
+
+    can_toggle_done = bool(request.user.is_superuser or is_manager(request.user))  # AAP: permission for button
 
     context = {
         "selected_client": client,
@@ -133,12 +267,65 @@ def audit_step_view(request, step_order: int):
         "team_form": team_form,
         "step15_substep_id": step15_substep.id if step15_substep else None,
         "can_manage_step15": can_manage_step15(request.user, client),
+        "can_view_step15": bool(
+            request.user.is_superuser
+            or is_manager(request.user)
+            or user_in_client_team(request.user, client)
+        ),
+
 
         # files
         "substep_files_map": substep_files_map,
+
+        # статусы подшагов
+        # AAP: substep statuses (idle/progress/done + checkmark)
+        "substep_status_class": substep_status_class,
+        "substep_is_done": substep_is_done_str,
+        "completed_by_label": completed_by_label,
+        "completed_at_label": completed_at_label,
+        "can_toggle_done": can_toggle_done,
+
     }
 
     return render(request, "core/audit_step.html", context)
+
+@login_required
+@require_POST
+def substep_status_toggle(request):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    # AAP: доступ тільки manager-група або superuser
+    if not (request.user.is_superuser or is_manager(request.user)):
+        return HttpResponseForbidden("Немає прав виконувати цю дію.")
+
+    substep_id = (request.POST.get("substep_id") or "").strip()
+    if not substep_id.isdigit():
+        return HttpResponseForbidden("Некоректний substep_id.")
+
+    substep = get_object_or_404(AuditSubStep, pk=int(substep_id), is_active=True)
+
+    st, _created = ClientSubStepStatus.objects.get_or_create(
+        client=client,
+        substep=substep,
+        defaults={"status": ClientSubStepStatus.Status.NOT_STARTED},
+    )
+
+    # AAP: toggle completed <-> not_started
+    if st.status == ClientSubStepStatus.Status.COMPLETED:
+        st.status = ClientSubStepStatus.Status.NOT_STARTED
+        st.completed_by = None
+        st.completed_at = None
+    else:
+        st.status = ClientSubStepStatus.Status.COMPLETED
+        st.completed_by = request.user
+        st.completed_at = timezone.now()
+
+    st.save()
+
+    return redirect(reverse("audit_step", args=[substep.step.order]) + f"?open={substep.id}")
+
 
 @login_required
 @require_POST

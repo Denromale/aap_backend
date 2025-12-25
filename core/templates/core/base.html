@@ -141,6 +141,12 @@
                        class="sidebar-link{% if request.resolver_match.url_name == 'metrics' %} is-active{% endif %}">
                         Метрики
                     </a>
+                    {% if is_manager %}
+                    <a class="sidebar-link" href="{% url 'upload_monitoring' %}">
+                        Моніторинг завантажень
+                    </a>
+                    {% endif %}
+
                 </nav>
         
                 <hr class="sidebar-divider">

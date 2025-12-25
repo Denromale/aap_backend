@@ -1,19 +1,53 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, FileResponse, Http404
-from django.urls import reverse
+import io
+import json
+import re
+import urllib.parse
+import zipfile
+import zlib
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.db import connection, transaction
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponse,
+    HttpResponseForbidden,
+    JsonResponse,
+)
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import get_valid_filename
+from django.views.decorators.http import require_POST
+
+from core.models import AuditSubStep, ClientDocument, ProcedureFile
+from core.services.file_cleanup import delete_file_if_unused
+from core.utils import require_active_client
 from core.views._client_qs import get_user_clients_qs
 
-from django.http import HttpResponseForbidden
-from core.services.file_cleanup import delete_file_if_unused
+# is_manager у тебя точно есть в core/decorators.py
+from core.decorators import is_manager
 
-from core.models import ClientDocument, ProcedureFile
-from core.utils import require_active_client
+# user_in_client_team может быть в другом модуле — подстрахуемся
+try:
+    from core.permissions import user_in_client_team
+except Exception:
+    def user_in_client_team(user, client) -> bool:
+        # fallback: если нет функции — пускаем только superuser/manager
+        return False
 
-import json
+
+def _safe_project_zip_name(name: str) -> str:
+    """
+    Безопасное имя для zip (на случай кириллицы/запрещённых символов).
+    """
+    base = (name or "project").strip() or "project"
+    base = re.sub(r"[<>:/\\|?*\x00-\x1F]", "_", base)
+    base = re.sub(r"\s+", " ", base).strip()
+    return base[:120]  # ограничим длину
+
 
 @login_required
 def documents_view(request):
@@ -243,8 +277,12 @@ def procedure_file_upload(request):
             substep_id = ""
 
     if not substep_id:
+        is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        if is_ajax:
+            return JsonResponse({"ok": False, "error": "Не обрано підкрок для завантаження."}, status=400)
         messages.error(request, "Не обрано підкрок для завантаження.")
         return redirect(reverse("audit_step", args=[1]))
+
 
     substep = get_object_or_404(AuditSubStep, pk=substep_id)
 
@@ -264,8 +302,11 @@ def procedure_file_upload(request):
     lock_key = zlib.crc32(lock_str.encode("utf-8")) & 0xFFFFFFFF
 
     with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_advisory_xact_lock(%s);", [lock_key])
+    # advisory lock работает только на Postgres
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(%s);", [lock_key])
+
 
         now = timezone.now()
         recent_dup = (
@@ -353,13 +394,44 @@ def procedure_file_delete(request, pk):
     if redirect_resp:
         return redirect_resp
 
-    f = get_object_or_404(ProcedureFile, pk=pk, client=client)
-    code = f.procedure_code
-    file_name = f.file.name
+    pf = get_object_or_404(ProcedureFile, pk=pk, client=client)
+    code = pf.procedure_code
+    file_name = pf.file.name
 
-    f.delete()
+    # 1) Удаляем запись из "Базы документів", созданную через шаг
+    ClientDocument.objects.filter(
+        organization=request.organization,
+        client=client,
+        file=file_name,
+    ).delete()
 
-    # удалить физический файл, если он больше нигде не используется
+    # 2) Удаляем файл из шага
+    pf.delete()
+
+    # 3) Удаляем физический файл, если он больше нигде не используется
     delete_file_if_unused(file_name, exclude_pf_id=pk)
 
     return redirect(reverse("audit_step", args=[1]) + f"?open={code}")
+
+
+
+@require_POST
+@login_required
+def document_delete(request, pk):
+    client, redirect_resp = require_active_client(request)
+    if redirect_resp:
+        return redirect_resp
+
+    doc = get_object_or_404(ClientDocument, pk=pk, client=client)
+    file_name = doc.file.name
+
+    # 1) Удаляем связанные файлы из шагов (ProcedureFile), которые указывают на тот же файл
+    ProcedureFile.objects.filter(client=client, file=file_name).delete()
+
+    # 2) Удаляем документ из "Базы документів"
+    doc.delete()
+
+    # 3) удалить физический файл, если он больше нигде не используется
+    delete_file_if_unused(file_name)
+
+    return redirect("documents")

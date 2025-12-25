@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
-
-
 MANAGER_GROUP = "manager"
 
 
@@ -54,25 +51,14 @@ def can_manage_step15(user, client) -> bool:
 
 
 def action_allowed_for_user(action, user, client) -> bool:
-    """
-    Единая проверка для StepAction:
-    - если у action указаны allowed_groups → пользователь должен быть в одной из групп
-    - иначе: fallback на участие в команде или менеджера/супера
-    """
-    if not getattr(user, "is_authenticated", False):
-        return False
-
+    # суперюзер всегда может
     if getattr(user, "is_superuser", False):
         return True
 
-    # 1) если ограничено группами — проверяем группы
-    allowed_groups = getattr(action, "allowed_groups", None)
-    if allowed_groups is not None:
-        # ManyToMany manager
-        if allowed_groups.exists():
-            user_group_names = set(user.groups.values_list("name", flat=True))
-            action_group_names = set(allowed_groups.values_list("name", flat=True))
-            return bool(user_group_names & action_group_names)
+    # менеджер-группа всегда может
+    if is_manager(user):
+        return True
 
-    # 2) иначе — допуск по команде или менеджеру
-    return is_manager(user) or user_in_client_team(user, client)
+    # любой участник команды может выполнять действия (генерация документов и т.д.)
+    return user_in_client_team(user, client)
+

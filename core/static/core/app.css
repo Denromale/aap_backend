@@ -600,18 +600,26 @@ html, body {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 12px 0 20px; /* чуть компактнее */
-    flex-wrap: wrap;     /* FIX: чтобы степпер не разъезжал страницу */
-    row-gap: 10px;
+    margin: 12px 0 20px;
+    flex-wrap: nowrap;          /* важно */
+    width: 100%;               /* важно */
+    overflow: visible;         /* AAP: не обрезаем активный кружок/ободок */
+    padding: 5px 6px;         /* AAP: место сверху/снизу для обводки + слева/справа */
+    box-sizing: border-box;
   }
+
+
+
+
   
   .aap-step {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative; /* AAP: для позиционирования ✓ */
     font-weight: 700;
     cursor: pointer;
     user-select: none;
@@ -621,16 +629,74 @@ html, body {
     transition: transform .05s ease-in-out;
     text-decoration: none;
     box-sizing: border-box;
+    flex: 0 0 36px;  /* чтобы кружки не сжимались */
+    padding-top: 8px;
+    padding-bottom: 8px;
+    overflow: visible; /* КЛЮЧЕВО */
   }
   
+  /* AAP: use shadow instead of outline to avoid clipping */
+  .aap-step.is-active {
+    box-shadow: 0 0 0 2px #003366;
+    transform: scale(1.05);
+  }
+
+
+  /* AAP: checkmark in substep stepper */
+.aap-step-check{
+  position:absolute;
+  right:-6px;
+  top:-8px;
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:800;
+  background:#ffffff;
+  border:2px solid #16a34a;
+  color:#16a34a;
+  line-height:1;
+}
+
+.aap-step-num{ line-height:1; }
+
+/* AAP: done toggle button (right-bottom in panel) */
+.aap-step-panel{
+  position:relative;
+  padding-bottom:70px; /* место под блок кнопки справа снизу */
+}
+
+.substep-done-box{
+  position:absolute;
+  right:0;
+  bottom:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+}
+
+.substep-done-meta{
+  font-size:13px;
+  color:#374151;
+  text-align:right;
+}
+
   .aap-step:active { transform: scale(0.98); }
   
   .aap-step-line {
-    flex: 1;
+    flex: 1 1 0;          /* ключевое */
+    min-width: 24px;
     height: 2px;
     background: #cbd5e1;
-    min-width: 16px; /* FIX: чтобы линии не делали ширину огромной */
   }
+
+
+
+
   
   .aap-step--progress {
     background: #fde68a;
@@ -651,7 +717,7 @@ html, body {
   }
   
   .aap-step.is-active {
-    box-shadow: 0 0 0 4px rgba(0, 41, 107, 0.25);
+    box-shadow: 0 0 0 2px #003366;
     transform: scale(1.05);
   }
   
@@ -881,3 +947,15 @@ html, body {
     }
   }
   
+/* Более яркий completed */
+.aap-step.is-completed {
+  outline: 3px solid #00C853;   /* ярко-зелёный */
+  outline-offset: 2px;
+}
+/* если у тебя кружок с заливкой — можно ещё так */
+.aap-step.is-completed {
+  background: #00C853;
+  border-color: #00C853;
+  color: #fff;
+}
+

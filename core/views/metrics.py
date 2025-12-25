@@ -5,6 +5,7 @@ from core.models import Client
 from django.utils import timezone
 from decimal import Decimal
 from decimal import Decimal, ROUND_HALF_UP
+from django.utils.dateparse import parse_date
 
 
 @login_required
