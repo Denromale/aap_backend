@@ -1,34 +1,42 @@
 {% extends "core/base.html" %}
 {% load aap_extras %}
 
-{% block title %}Моніторинг завантажень{% endblock %}
+{% block title %}Моніторинг проектів{% endblock %}
 
 {% block content %}
 <h1 style="margin:0 0 10px;">
   {% if selected_user %}
-    Моніторинг завантажень — {{ selected_user.get_full_name|default:selected_user.username }}
+    Моніторинг проектів — {{ selected_user.get_full_name|default:selected_user.username }}
   {% else %}
-    Моніторинг завантажень
+    Моніторинг проектів
   {% endif %}
 </h1>
 
 
 <style>
   /* компактная таблица */
-  .um-table { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff; }
+  .um-table { width:100%; border-collapse:collapse; background:#fff; }
   .um-table th, .um-table td { border:1px solid #e5e7eb; padding:6px 8px; vertical-align:middle; }
-  .um-table th { background:#f9fafb; font-weight:700; font-size:13px; }
+  .um-table th {
+    background:#f9fafb;
+    font-weight:700;
+    font-size:13px;
+    text-align: center;        /* ⬅ центр шапки */
+    vertical-align: middle;
+    }
+
   .um-table td { font-size:13px; }
   .um-wrap { white-space:normal; word-break:break-word; }
 
   /* кружочки: вертикально под шагами */
   .um-steps-grid{
-    display:grid;
-    grid-template-columns: repeat(12, 20px);
-    gap: 2px;
-    align-items:start;
-    justify-content:start;
-  }
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(12, minmax(0, 1fr)); /* 12 равных колонок */
+    gap: 6px;              /* можно 4–8, подбери визуально */
+    align-items: start;
+    }
+
   .um-step-col{
     display:flex;
     flex-direction:column;
@@ -37,10 +45,13 @@
     min-width:0;
   }
   .um-step-num{
-    font-weight:700;
-    font-size:12px;
-    line-height:1;
-  }
+    font-weight: 700;
+    font-size: 11px;     /* чуть меньше для узких */
+    line-height: 1;
+    display: block;
+    text-align: center;
+    white-space: nowrap;
+    }
   .um-dots-col{
     display:flex;
     flex-direction:column;
@@ -83,7 +94,8 @@
   .w-deadline{ width:10%; }
   .w-manager{ width:14%; }
   .w-team{ width:7%; }
-  .w-steps{ width:18%; }
+  .w-steps{ width:420px; min-width:420px; }
+
 
   /* строка фильтров в шапке */
   .um-filter-row th{ padding:6px 8px; background:#fff; }
@@ -148,6 +160,23 @@
     .um-reset-btn:hover{
     background:#f9fafb;
     }
+    .um-table-wrap{
+    width: 100%;
+    overflow-x: auto;
+    }
+
+    .um-table{
+    min-width: 1180px; /* чтобы "Кроки" не ломались */
+    }
+    .um-sort-link{
+    color: inherit;
+    text-decoration: none;
+    font-weight: 700;
+    }
+    .um-sort-link:hover{
+    text-decoration: underline;
+    }
+
 
 
 </style>
@@ -162,7 +191,7 @@
         <input type="checkbox" name="active_only" value="1"
                 {% if active_only %}checked{% endif %}
                 onchange="this.form.submit()">
-        Активні проєкти
+        Активні проєкти ({{ projects_count }})
         </label>
     </div>
 
@@ -178,14 +207,18 @@
 
     </div>
 
-
+  <div class="um-table-wrap">
   <table class="um-table">
     <thead>
       <tr>
         <th class="w-client">Назва клієнта</th>
         <th class="w-subject">Предмет завдання</th>
-        <th class="w-deadline">Кінцевий строк</th>
-        <th class="w-manager">Менеджер проєкту</th>
+        <th class="w-deadline">
+            <a class="um-sort-link" href="?{{ sort_deadline_qs }}">Кінцевий строк{{ deadline_icon }}</a>
+        </th>
+        <th class="w-manager">
+            <a class="um-sort-link" href="?{{ sort_manager_qs }}">Партнер по проєкту{{ manager_icon }}</a>
+        </th>
         <th class="w-team">Команда</th>
         <th class="w-steps">Кроки</th>
       </tr>
@@ -205,23 +238,8 @@
           </select>
         </th>
 
-        <th>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <input type="date" name="date_from" value="{{ context_filters.date_from }}">
-            <input type="date" name="date_to" value="{{ context_filters.date_to }}">
-          </div>
-        </th>
-
-        <th>
-          <select name="manager">
-            <option value="">— всі —</option>
-            {% for opt in manager_choices %}
-              <option value="{{ opt.value }}" {% if context_filters.manager == opt.value %}selected{% endif %}>
-                {{ opt.label }}
-              </option>
-            {% endfor %}
-          </select>
-        </th>
+        <th></th>  {# вместо кінцевого строку #}
+        <th></th>  {# вместо менеджера #}
 
         <th>
         </th>
@@ -295,7 +313,7 @@
       {% endfor %}
     </tbody>
   </table>
-
+</div>
 </form>
 
 {# modal команды #}
