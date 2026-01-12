@@ -9,6 +9,10 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.http import HttpResponseForbidden
 from core.models import ClientDocument
 
+from datetime import datetime
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 
 from core.models import Client
 from core.forms import ClientForm
@@ -103,8 +107,9 @@ def news_detail(request, pk):
 @login_required
 def client_create(request):
     # клиентов создаёт только админ
-    if not request.user.is_superuser:
-        return redirect("dashboard")
+    if not is_manager(request.user):
+        return HttpResponseForbidden("Доступ лише для групи manager.")
+
 
     if request.method == "POST":
         form = ClientForm(request.POST, request.FILES)
@@ -188,6 +193,79 @@ def client_create(request):
 
     return render(request, "core/client_form.html", {"form": form})
 
+@require_GET
+@login_required
+def client_prefill(request):
+    # доступ: только manager (как ты требуешь для CRUD)
+    if not is_manager(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    requisites_number = (request.GET.get("requisites_number") or "").strip()
+    requisites_date = (request.GET.get("requisites_date") or "").strip()
+
+    if not requisites_number:
+        return JsonResponse({"ok": False, "error": "empty"}, status=400)
+
+    qs = Client.objects.filter(
+        organization=request.organization,
+        requisites_number=requisites_number,
+    ).order_by("-created_at")
+
+    # если дата передана — сузим
+    if requisites_date:
+        try:
+            parsed = datetime.strptime(requisites_date, "%Y-%m-%d").date()
+        except ValueError:
+            return JsonResponse({"ok": False, "error": "bad_date"}, status=400)
+        qs = qs.filter(requisites_date=parsed)
+
+    client = qs.first()
+    if not client:
+        return JsonResponse({"ok": True, "found": False})
+
+    # ВАЖНО: отдаём только поля, которые можно безопасно копировать.
+    # Не копируем: id, created_at, is_completed, статусные поля, команду, файлы.
+    data = {
+        "name": client.name or "",
+        "edrpou": client.edrpou or "",
+
+        "address_country": client.address_country or "",
+        "address_city": client.address_city or "",
+        "address_street": client.address_street or "",
+        "address_building": client.address_building or "",
+        "address_office": client.address_office or "",
+        "address_zip": client.address_zip or "",
+
+        "kved": client.kved or "",
+        "poi": bool(client.poi),
+
+        "requisites_number": client.requisites_number or "",
+        "requisites_date": client.requisites_date.isoformat() if client.requisites_date else "",
+        "requisites_amount": str(client.requisites_amount) if client.requisites_amount is not None else "",
+        "requisites_vat": str(client.requisites_vat) if client.requisites_vat is not None else "",
+
+        "planned_hours": str(client.planned_hours) if client.planned_hours is not None else "",
+
+        "supervision_body": client.supervision_body or "",
+        "legal_form": client.legal_form or "",
+        "mandatory_audit": bool(client.mandatory_audit),
+
+        "reporting_period": client.reporting_period or "",
+        "contract_deadline": client.contract_deadline.isoformat() if client.contract_deadline else "",
+
+        "engagement_subject": client.engagement_subject or "",
+
+        "authorized_person_name": client.authorized_person_name or "",
+        "authorized_person_email": client.authorized_person_email or "",
+
+        "status": client.status or "",
+
+        # Команда — если хочешь подтягивать:
+        "manager": client.manager_id or "",
+        "qa_manager": client.qa_manager_id or "",
+    }
+    return JsonResponse({"ok": True, "found": True, "data": data})
+
 @login_required
 def client_edit(request, pk):
     # находим клиента только в текущей организации
@@ -210,8 +288,9 @@ def client_edit(request, pk):
         ]
     )
 
-    if not (request.user.is_superuser or is_manager_group or is_in_team):
-        return HttpResponseForbidden("У вас немає прав редагувати цього клієнта.")
+    if not is_manager(request.user):
+        return HttpResponseForbidden("Доступ лише для групи manager.")
+
 
     if request.method == "POST":
         form = ClientForm(request.POST, request.FILES, instance=client)
@@ -287,8 +366,9 @@ def client_delete(request, pk):
 
     # только менеджер или суперюзер
     is_manager_flag = is_manager(request.user)
-    if not (is_manager_flag or request.user.is_superuser):
-        return HttpResponseForbidden("У вас немає прав видаляти клієнтів.")
+    if not is_manager(request.user):
+        return HttpResponseForbidden("Доступ лише для групи manager.")
+
 
     # если надо подтверждение – можно оставить GET-страницу.
     # Сейчас просто удаляем и уходим на дашборд.

@@ -22,6 +22,7 @@ urlpatterns = [
 
     # --- Clients ---
     path("clients/add/", views.client_create, name="client_create"),
+    path("clients/prefill/", views.client_prefill, name="client_prefill"),
     path("clients/<int:pk>/details/", views.client_detail, name="client_detail"),
     path("clients/<int:pk>/edit/", views.client_edit, name="client_edit"),
     path("clients/<int:pk>/delete/", views.client_delete, name="client_delete"),

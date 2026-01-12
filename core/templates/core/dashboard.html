@@ -12,13 +12,14 @@
         Проєкти, у яких ви приймаєте участь як член команди
     </p>
 
-    {% if user.is_superuser %}
+    {% if user.is_superuser or is_manager %}
         <p>
             <a class="btn btn-primary" href="{% url 'client_create' %}">
                 {% trans "Додати клієнта" %}
             </a>
         </p>
     {% endif %}
+
 
     {# ---------- ФИЛЬТРЫ ---------- #}
     <form method="get" class="table-filters">

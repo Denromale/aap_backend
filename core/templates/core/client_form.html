@@ -131,7 +131,7 @@
         {% endif %}
     </p>
 
-    <h2>{% trans "КВЕД та ПОІ" %}</h2>
+    <h2>{% trans "КВЕД та ПСІ" %}</h2>
 
     <p class="{% if form.kved.errors %}has-error{% endif %}">
         <label for="{{ form.kved.id_for_label }}">
@@ -457,4 +457,105 @@
         </button>
     {% endif %}
 </form>
+<script>
+(function () {
+  const numberEl = document.getElementById("id_requisites_number");
+  const dateEl   = document.getElementById("id_requisites_date");
+
+  if (!numberEl) return;
+
+  let timer = null;
+  let lastKey = "";
+
+  function setVal(fieldId, value) {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    el.value = value ?? "";
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  async function runPrefill() {
+    const num = (numberEl.value || "").trim();
+    const date = dateEl ? (dateEl.value || "").trim() : "";
+
+    if (!num || num.length < 2) return;
+
+    const key = num + "|" + date;
+    if (key === lastKey) return;
+    lastKey = key;
+
+    const params = new URLSearchParams({ requisites_number: num });
+    if (date) params.set("requisites_date", date);
+
+    const resp = await fetch("{% url 'client_prefill' %}?" + params.toString(), {
+      headers: { "X-Requested-With": "fetch" }
+    });
+
+    if (!resp.ok) return;
+
+    const json = await resp.json();
+    if (!json.ok || !json.found) return;
+
+    const d = json.data || {};
+
+    // заполняем поля из формы (ids в Django: id_<fieldname>)
+    setVal("id_name", d.name);
+    setVal("id_edrpou", d.edrpou);
+
+    setVal("id_address_country", d.address_country);
+    setVal("id_address_city", d.address_city);
+    setVal("id_address_street", d.address_street);
+    setVal("id_address_building", d.address_building);
+    setVal("id_address_office", d.address_office);
+    setVal("id_address_zip", d.address_zip);
+
+    setVal("id_kved", d.kved);
+    // poi checkbox
+    const poiEl = document.getElementById("id_poi");
+    if (poiEl && typeof d.poi !== "undefined") {
+      poiEl.checked = !!d.poi;
+      poiEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    setVal("id_requisites_number", d.requisites_number);
+    setVal("id_requisites_date", d.requisites_date);
+    setVal("id_requisites_amount", d.requisites_amount);
+    setVal("id_requisites_vat", d.requisites_vat);
+
+    setVal("id_planned_hours", d.planned_hours);
+
+    setVal("id_supervision_body", d.supervision_body);
+    setVal("id_legal_form", d.legal_form);
+    const mandatoryEl = document.getElementById("id_mandatory_audit");
+    if (mandatoryEl && typeof d.mandatory_audit !== "undefined") {
+      mandatoryEl.checked = !!d.mandatory_audit;
+      mandatoryEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    setVal("id_reporting_period", d.reporting_period);
+    setVal("id_contract_deadline", d.contract_deadline);
+
+    // ВАЖНО: предмет завдання НЕ заполняем (по ТЗ пользователь корректирует его)
+    // setVal("id_engagement_subject", d.engagement_subject);
+
+    setVal("id_authorized_person_name", d.authorized_person_name);
+    setVal("id_authorized_person_email", d.authorized_person_email);
+
+    setVal("id_status", d.status);
+
+    // Команду не трогаем (аудиторы/ассистенты disabled), но manager/qa_manager можно подтянуть:
+    setVal("id_manager", d.manager);
+    setVal("id_qa_manager", d.qa_manager);
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(runPrefill, 350);
+  }
+
+  numberEl.addEventListener("input", schedule);
+  if (dateEl) dateEl.addEventListener("change", schedule);
+})();
+</script>
 {% endblock %}
